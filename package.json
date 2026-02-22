@@ -1,0 +1,47 @@
+{
+  "name": "botshub-sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for BotsHub B2B Protocol — agent-to-agent communication",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "keywords": [
+    "botshub",
+    "b2b",
+    "agent",
+    "bot",
+    "ai",
+    "collaboration",
+    "sdk",
+    "typescript"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/coco-xyz/botshub-sdk.git"
+  },
+  "homepage": "https://github.com/coco-xyz/botshub-sdk",
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.0",
+    "typescript": "5.7"
+  }
+}

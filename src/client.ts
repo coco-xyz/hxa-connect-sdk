@@ -1,0 +1,642 @@
+import type {
+  Agent,
+  AgentProfileInput,
+  Artifact,
+  ArtifactInput,
+  CatchupCountResponse,
+  CatchupResponse,
+  Channel,
+  CloseReason,
+  FileRecord,
+  MessagePart,
+  ScopedToken,
+  Thread,
+  ThreadParticipant,
+  ThreadPermissionPolicy,
+  ThreadStatus,
+  ThreadType,
+  TokenScope,
+  WireMessage,
+  WireThreadMessage,
+  WsServerEvent,
+} from './types.js';
+
+// ─── WebSocket Abstraction ───────────────────────────────────
+
+type WebSocketLike = {
+  send(data: string): void;
+  close(): void;
+  addEventListener(type: string, listener: (event: any) => void): void;
+  removeEventListener(type: string, listener: (event: any) => void): void;
+  readyState: number;
+};
+
+const WS_OPEN = 1;
+
+/**
+ * Create a WebSocket connection. Uses the `ws` package in Node.js
+ * and the native WebSocket in browsers.
+ */
+async function createWebSocket(url: string): Promise<WebSocketLike> {
+  // Browser environment
+  if (typeof globalThis.WebSocket !== 'undefined') {
+    return new Promise<WebSocketLike>((resolve, reject) => {
+      const socket = new globalThis.WebSocket(url);
+      socket.addEventListener('open', () => resolve(socket as unknown as WebSocketLike));
+      socket.addEventListener('error', () => reject(new Error('WebSocket connection failed')));
+    });
+  }
+
+  // Node.js environment — dynamic import ws
+  const { default: WS } = await import('ws');
+  return new Promise<WebSocketLike>((resolve, reject) => {
+    const socket = new WS(url);
+    socket.on('open', () => resolve(socket as unknown as WebSocketLike));
+    socket.on('error', (e: Error) => reject(new Error(`WebSocket connection failed: ${e.message}`)));
+  });
+}
+
+// ─── HTTP Helpers ────────────────────────────────────────────
+
+interface RequestOptions {
+  method?: string;
+  body?: unknown;
+  headers?: Record<string, string>;
+}
+
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly body: unknown,
+  ) {
+    const msg = typeof body === 'object' && body !== null && 'error' in body
+      ? (body as { error: string }).error
+      : `HTTP ${status}`;
+    super(msg);
+    this.name = 'ApiError';
+  }
+}
+
+// ─── Client Options ──────────────────────────────────────────
+
+export interface BotsHubClientOptions {
+  /** Base URL of the BotsHub server (e.g. "http://localhost:4800") */
+  url: string;
+  /** Agent authentication token */
+  token: string;
+  /** HTTP request timeout in milliseconds (default: 30000) */
+  timeout?: number;
+}
+
+// ─── Main Client ─────────────────────────────────────────────
+
+export type EventHandler = (data: any) => void;
+
+export class BotsHubClient {
+  private readonly baseUrl: string;
+  private readonly token: string;
+  private readonly timeout: number;
+  private ws: WebSocketLike | null = null;
+  private eventHandlers: Map<string, Set<EventHandler>> = new Map();
+  private cachedBotId: string | null = null;
+
+  constructor(options: BotsHubClientOptions) {
+    // Strip trailing slash
+    this.baseUrl = options.url.replace(/\/+$/, '');
+    this.token = options.token;
+    this.timeout = options.timeout ?? 30_000;
+  }
+
+  // ─── HTTP ────────────────────────────────────────────────
+
+  private async request<T = unknown>(path: string, opts: RequestOptions = {}): Promise<T> {
+    const url = `${this.baseUrl}${path}`;
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${this.token}`,
+      ...opts.headers,
+    };
+
+    const init: RequestInit = {
+      method: opts.method || 'GET',
+      headers,
+    };
+
+    if (opts.body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      init.body = JSON.stringify(opts.body);
+    }
+
+    const response = await fetch(url, { ...init, signal: AbortSignal.timeout(this.timeout) });
+
+    if (!response.ok) {
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        body = await response.text().catch(() => null);
+      }
+      throw new ApiError(response.status, body);
+    }
+
+    if (response.status === 204) return undefined as T;
+    return response.json() as Promise<T>;
+  }
+
+  private get<T = unknown>(path: string): Promise<T> {
+    return this.request<T>(path);
+  }
+
+  private post<T = unknown>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>(path, { method: 'POST', body });
+  }
+
+  private patch<T = unknown>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>(path, { method: 'PATCH', body });
+  }
+
+  private delete<T = unknown>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>(path, { method: 'DELETE', body });
+  }
+
+  // ─── WebSocket Connection ────────────────────────────────
+
+  /**
+   * Connect to the BotsHub WebSocket for real-time events.
+   * Events are received via the `.on()` method.
+   *
+   * Note: The auth token is passed via URL query parameter because the WebSocket
+   * protocol does not support custom headers during the handshake.
+   */
+  async connect(): Promise<void> {
+    if (this.ws && this.ws.readyState === WS_OPEN) {
+      return; // Already connected
+    }
+
+    const wsUrl = this.baseUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:') + `/ws?token=${encodeURIComponent(this.token)}`;
+    this.ws = await createWebSocket(wsUrl);
+
+    this.ws.addEventListener('message', (event: any) => {
+      const data = typeof event.data === 'string' ? event.data : event.data?.toString?.();
+      if (!data) return;
+
+      try {
+        const parsed = JSON.parse(data) as WsServerEvent;
+        this.emit(parsed.type, parsed);
+        this.emit('*', parsed); // Wildcard handler
+      } catch {
+        // Non-JSON message, ignore
+      }
+    });
+
+    this.ws.addEventListener('close', () => {
+      this.ws = null;
+      this.emit('close', undefined);
+    });
+
+    this.ws.addEventListener('error', (e: any) => {
+      this.emit('error', e);
+    });
+  }
+
+  /**
+   * Disconnect the WebSocket connection.
+   * Event handlers registered via `.on()` are preserved and will fire
+   * again if `.connect()` is called later. Use `.off()` to remove them.
+   */
+  disconnect(): void {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+  }
+
+  /**
+   * Register an event handler for WebSocket events.
+   *
+   * Supported event types match WsServerEvent.type:
+   * - `message` — Channel message received
+   * - `agent_online` / `agent_offline` — Bot presence changes
+   * - `channel_created` — New channel created
+   * - `thread_created` / `thread_updated` — Thread lifecycle
+   * - `thread_message` — Message in a thread
+   * - `thread_artifact` — Artifact added or updated
+   * - `thread_participant` — Bot joined or left a thread
+   * - `error` — Error event
+   * - `pong` — Pong response to ping
+   * - `close` — WebSocket disconnected
+   * - `*` — Wildcard: receives all events
+   */
+  on(event: string, handler: EventHandler): void {
+    if (!this.eventHandlers.has(event)) {
+      this.eventHandlers.set(event, new Set());
+    }
+    this.eventHandlers.get(event)!.add(handler);
+  }
+
+  /**
+   * Remove an event handler.
+   */
+  off(event: string, handler: EventHandler): void {
+    const handlers = this.eventHandlers.get(event);
+    if (handlers) {
+      handlers.delete(handler);
+    }
+  }
+
+  private emit(event: string, data: unknown): void {
+    const handlers = this.eventHandlers.get(event);
+    if (handlers) {
+      for (const handler of handlers) {
+        try {
+          handler(data);
+        } catch (err) {
+          // Don't let handler errors break the event loop, but surface them
+          if (event !== 'error') {
+            this.emit('error', err);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Send a ping over the WebSocket. The server will respond with a `pong` event.
+   */
+  ping(): void {
+    if (this.ws && this.ws.readyState === WS_OPEN) {
+      this.ws.send(JSON.stringify({ type: 'ping' }));
+    }
+  }
+
+  // ─── Channels ────────────────────────────────────────────
+
+  /**
+   * List channels the current bot is a member of.
+   */
+  listChannels(): Promise<(Channel & { members: string[] })[]> {
+    return this.get<(Channel & { members: string[] })[]>('/api/channels');
+  }
+
+  /**
+   * Get channel details including members.
+   */
+  getChannel(id: string): Promise<Channel & { members: { id: string; name: string; display_name: string | null; online: boolean }[] }> {
+    return this.get(`/api/channels/${id}`);
+  }
+
+  /**
+   * Send a message to a channel.
+   */
+  sendMessage(
+    channelId: string,
+    content: string,
+    opts?: { parts?: MessagePart[]; content_type?: string },
+  ): Promise<WireMessage> {
+    return this.post<WireMessage>(`/api/channels/${channelId}/messages`, {
+      content,
+      content_type: opts?.content_type,
+      parts: opts?.parts,
+    });
+  }
+
+  /**
+   * Get messages from a channel.
+   * Returns messages in chronological order.
+   */
+  getMessages(
+    channelId: string,
+    opts?: { limit?: number; before?: number },
+  ): Promise<WireMessage[]> {
+    const params = new URLSearchParams();
+    if (opts?.limit !== undefined) params.set('limit', String(opts.limit));
+    if (opts?.before !== undefined) params.set('before', String(opts.before));
+    const qs = params.toString();
+    return this.get<WireMessage[]>(`/api/channels/${channelId}/messages${qs ? '?' + qs : ''}`);
+  }
+
+  // ─── Direct Messaging ────────────────────────────────────
+
+  /**
+   * Send a direct message to another bot by name or ID.
+   * Automatically creates a direct channel if one doesn't exist.
+   */
+  send(
+    to: string,
+    content: string,
+    opts?: { parts?: MessagePart[]; content_type?: string },
+  ): Promise<{ channel_id: string; message: WireMessage }> {
+    return this.post(`/api/send`, {
+      to,
+      content,
+      content_type: opts?.content_type,
+      parts: opts?.parts,
+    });
+  }
+
+  // ─── Threads ─────────────────────────────────────────────
+
+  /**
+   * Create a new collaboration thread.
+   */
+  createThread(opts: {
+    topic: string;
+    type?: ThreadType;
+    participants?: string[];
+    context?: object | string;
+    channel_id?: string;
+    permission_policy?: ThreadPermissionPolicy;
+  }): Promise<Thread> {
+    return this.post<Thread>('/api/threads', {
+      topic: opts.topic,
+      type: opts.type,
+      participants: opts.participants,
+      channel_id: opts.channel_id,
+      context: opts.context,
+      permission_policy: opts.permission_policy,
+    });
+  }
+
+  /**
+   * Get thread details with participant info.
+   */
+  getThread(id: string): Promise<Thread & { participants: ThreadParticipant[] }> {
+    return this.get(`/api/threads/${id}`);
+  }
+
+  /**
+   * List threads the current bot participates in.
+   * Optionally filter by status.
+   */
+  listThreads(opts?: { status?: ThreadStatus }): Promise<Thread[]> {
+    const params = new URLSearchParams();
+    if (opts?.status) params.set('status', opts.status);
+    const qs = params.toString();
+    return this.get<Thread[]>(`/api/threads${qs ? '?' + qs : ''}`);
+  }
+
+  /**
+   * Update a thread's status, context, or topic.
+   */
+  updateThread(
+    id: string,
+    updates: {
+      status?: ThreadStatus;
+      close_reason?: CloseReason;
+      context?: object | string | null;
+      topic?: string;
+      permission_policy?: ThreadPermissionPolicy | null;
+    },
+  ): Promise<Thread> {
+    return this.patch<Thread>(`/api/threads/${id}`, updates);
+  }
+
+  // ─── Thread Messages ─────────────────────────────────────
+
+  /**
+   * Send a message within a thread.
+   */
+  sendThreadMessage(
+    threadId: string,
+    content: string,
+    opts?: { parts?: MessagePart[]; metadata?: object | string | null; content_type?: string },
+  ): Promise<WireThreadMessage> {
+    return this.post<WireThreadMessage>(`/api/threads/${threadId}/messages`, {
+      content,
+      content_type: opts?.content_type,
+      parts: opts?.parts,
+      metadata: opts?.metadata,
+    });
+  }
+
+  /**
+   * Get messages from a thread.
+   * Returns messages in chronological order.
+   */
+  getThreadMessages(
+    threadId: string,
+    opts?: { limit?: number; before?: number },
+  ): Promise<WireThreadMessage[]> {
+    const params = new URLSearchParams();
+    if (opts?.limit !== undefined) params.set('limit', String(opts.limit));
+    if (opts?.before !== undefined) params.set('before', String(opts.before));
+    const qs = params.toString();
+    return this.get<WireThreadMessage[]>(`/api/threads/${threadId}/messages${qs ? '?' + qs : ''}`);
+  }
+
+  // ─── Participants ────────────────────────────────────────
+
+  /**
+   * Invite a bot to join a thread.
+   * @param threadId - The thread to invite to
+   * @param botId - Bot ID or name to invite
+   * @param label - Optional role label (e.g. "reviewer", "lead")
+   */
+  invite(threadId: string, botId: string, label?: string): Promise<ThreadParticipant> {
+    return this.post<ThreadParticipant>(`/api/threads/${threadId}/participants`, {
+      bot_id: botId,
+      label,
+    });
+  }
+
+  /**
+   * Leave a thread (remove self as participant).
+   * @param threadId - The thread to leave
+   */
+  async leave(threadId: string): Promise<void> {
+    if (!this.cachedBotId) {
+      const me = await this.getProfile();
+      this.cachedBotId = me.id;
+    }
+    await this.delete(`/api/threads/${threadId}/participants/${this.cachedBotId}`);
+  }
+
+  // ─── Artifacts ───────────────────────────────────────────
+
+  /**
+   * Add a new artifact to a thread.
+   * Use a unique artifact_key for each distinct work product.
+   */
+  addArtifact(threadId: string, key: string, artifact: ArtifactInput): Promise<Artifact> {
+    return this.post<Artifact>(`/api/threads/${threadId}/artifacts`, {
+      artifact_key: key,
+      type: artifact.type,
+      title: artifact.title,
+      content: artifact.content,
+      language: artifact.language,
+      url: artifact.url,
+      mime_type: artifact.mime_type,
+    });
+  }
+
+  /**
+   * Update an existing artifact (creates a new version).
+   */
+  updateArtifact(
+    threadId: string,
+    key: string,
+    updates: { content: string; title?: string | null },
+  ): Promise<Artifact> {
+    return this.patch<Artifact>(`/api/threads/${threadId}/artifacts/${encodeURIComponent(key)}`, updates);
+  }
+
+  /**
+   * List the latest version of each artifact in a thread.
+   */
+  listArtifacts(threadId: string): Promise<Artifact[]> {
+    return this.get<Artifact[]>(`/api/threads/${threadId}/artifacts`);
+  }
+
+  /**
+   * Get all versions of a specific artifact.
+   */
+  getArtifactVersions(threadId: string, key: string): Promise<Artifact[]> {
+    return this.get<Artifact[]>(`/api/threads/${threadId}/artifacts/${encodeURIComponent(key)}/versions`);
+  }
+
+  // ─── Files ───────────────────────────────────────────────
+
+  /**
+   * Upload a file to the BotsHub server.
+   * Works in both Node.js (Buffer) and browser (Blob/File) environments.
+   */
+  async uploadFile(
+    file: Buffer | Blob,
+    name: string,
+    mimeType?: string,
+  ): Promise<FileRecord> {
+    const url = `${this.baseUrl}/api/files/upload`;
+
+    // Build multipart form data
+    const formData = new FormData();
+
+    if (typeof Blob !== 'undefined' && file instanceof Blob) {
+      // Browser environment or Node 18+ with Blob
+      formData.append('file', file, name);
+    } else {
+      // Node.js Buffer — wrap in Blob
+      const blob = new Blob([file as Buffer], { type: mimeType || 'application/octet-stream' });
+      formData.append('file', blob, name);
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+      },
+      body: formData,
+      signal: AbortSignal.timeout(this.timeout),
+    });
+
+    if (!response.ok) {
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        body = await response.text().catch(() => null);
+      }
+      throw new ApiError(response.status, body);
+    }
+
+    return response.json() as Promise<FileRecord>;
+  }
+
+  /**
+   * Get the download URL for a file by its ID.
+   * Note: The URL requires authentication (Bearer token).
+   */
+  getFileUrl(fileId: string): string {
+    return `${this.baseUrl}/api/files/${fileId}`;
+  }
+
+  // ─── Catchup (Offline Event Replay) ──────────────────────
+
+  /**
+   * Get events that occurred while this bot was offline.
+   * Supports pagination via cursor.
+   */
+  catchup(opts: { since: number; cursor?: string; limit?: number }): Promise<CatchupResponse> {
+    const params = new URLSearchParams();
+    params.set('since', String(opts.since));
+    if (opts?.cursor) params.set('cursor', opts.cursor);
+    if (opts?.limit !== undefined) params.set('limit', String(opts.limit));
+    const qs = params.toString();
+    return this.get<CatchupResponse>(`/api/me/catchup${qs ? '?' + qs : ''}`);
+  }
+
+  /**
+   * Get a count of missed events by type (lightweight check before full catchup).
+   */
+  catchupCount(opts: { since: number }): Promise<CatchupCountResponse> {
+    const params = new URLSearchParams();
+    params.set('since', String(opts.since));
+    const qs = params.toString();
+    return this.get<CatchupCountResponse>(`/api/me/catchup/count${qs ? '?' + qs : ''}`);
+  }
+
+  // ─── Profile ─────────────────────────────────────────────
+
+  /**
+   * Get the current bot's profile.
+   */
+  getProfile(): Promise<Agent> {
+    return this.get<Agent>('/api/me');
+  }
+
+  /**
+   * Update the current bot's profile fields.
+   */
+  updateProfile(fields: AgentProfileInput): Promise<Agent> {
+    return this.patch<Agent>('/api/me/profile', fields);
+  }
+
+  /**
+   * List other bots in the same organization.
+   */
+  listPeers(): Promise<Agent[]> {
+    return this.get<Agent[]>('/api/peers');
+  }
+
+  // ─── Scoped Tokens ──────────────────────────────────────
+
+  /**
+   * Create a scoped token with limited permissions and optional expiry.
+   * @param scopes - Array of permission scopes (e.g., ['read'], ['thread', 'message'])
+   * @param opts.label - Human-readable label for this token
+   * @param opts.expires_in - Token lifetime in milliseconds (omit for non-expiring)
+   */
+  createToken(
+    scopes: TokenScope[],
+    opts?: { label?: string; expires_in?: number },
+  ): Promise<ScopedToken> {
+    return this.post<ScopedToken>('/api/me/tokens', {
+      scopes,
+      label: opts?.label,
+      expires_in: opts?.expires_in,
+    });
+  }
+
+  /**
+   * List all scoped tokens for the current bot.
+   * Token values are not included — only metadata.
+   */
+  listTokens(): Promise<ScopedToken[]> {
+    return this.get<ScopedToken[]>('/api/me/tokens');
+  }
+
+  /**
+   * Revoke a scoped token by ID.
+   */
+  revokeToken(tokenId: string): Promise<{ ok: boolean }> {
+    return this.delete<{ ok: boolean }>(`/api/me/tokens/${tokenId}`);
+  }
+
+  // ─── Inbox ───────────────────────────────────────────────
+
+  /**
+   * Get new messages across all channels since a timestamp.
+   * @param since - Unix timestamp in milliseconds
+   */
+  inbox(since: number): Promise<WireMessage[]> {
+    return this.get<WireMessage[]>(`/api/inbox?since=${since}`);
+  }
+}
