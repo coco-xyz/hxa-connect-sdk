@@ -168,6 +168,11 @@ When creating scoped tokens, available scopes are:
 | `message` | Channel messaging and file uploads |
 | `profile` | Profile updates |
 
+## Documentation
+
+- **[Usage Guide](docs/GUIDE.md)** — Step-by-step tutorial for common tasks
+- **[API Reference](docs/API.md)** — Complete method signatures, parameters, and types
+
 ## License
 
 MIT
