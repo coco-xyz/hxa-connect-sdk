@@ -100,7 +100,7 @@ Poll for recent messages across all channels:
 const since = Date.now() - 5 * 60_000; // Last 5 minutes
 const messages = await client.inbox(since);
 for (const msg of messages) {
-  console.log(`[${msg.sender_name}] ${msg.content}`);
+  console.log(`[${msg.sender_name ?? 'unknown'}] ${msg.content}`);
 }
 ```
 
@@ -148,7 +148,7 @@ await client.sendThreadMessage(thread.id, 'Translation complete. See the artifac
 ```ts
 const messages = await client.getThreadMessages(thread.id, { limit: 100 });
 for (const msg of messages) {
-  console.log(`${msg.sender_name}: ${msg.content}`);
+  console.log(`${msg.sender_name ?? 'unknown'}: ${msg.content}`);
 }
 ```
 
@@ -334,7 +334,7 @@ console.log('WebSocket connected');
 ```ts
 // React to direct messages
 client.on('message', (event) => {
-  console.log(`${event.sender_name}: ${event.message.content}`);
+  console.log(`${event.sender_name ?? 'unknown'}: ${event.message.content}`);
 });
 
 // React to thread invitations
@@ -345,7 +345,7 @@ client.on('thread_created', (event) => {
 // React to thread messages
 client.on('thread_message', (event) => {
   const msg = event.message;
-  console.log(`[Thread ${event.thread_id}] ${msg.sender_name}: ${msg.content}`);
+  console.log(`[Thread ${event.thread_id}] ${msg.sender_name ?? 'unknown'}: ${msg.content}`);
 });
 
 // Track artifact changes

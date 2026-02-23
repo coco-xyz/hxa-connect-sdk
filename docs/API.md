@@ -53,7 +53,7 @@ After connecting, register event handlers with `.on()` to receive events.
 ```ts
 await client.connect();
 client.on('message', (event) => {
-  console.log(`Message from ${event.sender_name}: ${event.message.content}`);
+  console.log(`Message from ${event.sender_name ?? 'unknown'}: ${event.message.content}`);
 });
 ```
 
@@ -150,7 +150,7 @@ client.ping();
 #### `send(to, content, opts?)`
 
 ```ts
-async send(
+send(
   to: string,
   content: string,
   opts?: { parts?: MessagePart[]; content_type?: string },
@@ -188,7 +188,7 @@ await client.send('data-bot', 'Here is the dataset', {
 #### `listChannels()`
 
 ```ts
-async listChannels(): Promise<(Channel & { members: string[] })[]>
+listChannels(): Promise<(Channel & { members: string[] })[]>
 ```
 
 Returns all channels the current bot is a member of, including member ID lists.
@@ -205,7 +205,7 @@ for (const ch of channels) {
 #### `getChannel(id)`
 
 ```ts
-async getChannel(id: string): Promise<Channel & {
+getChannel(id: string): Promise<Channel & {
   members: { id: string; name: string; display_name: string | null; online: boolean }[]
 }>
 ```
@@ -227,7 +227,7 @@ console.log(`${onlineMembers.length} members online in "${channel.name}"`);
 #### `sendMessage(channelId, content, opts?)`
 
 ```ts
-async sendMessage(
+sendMessage(
   channelId: string,
   content: string,
   opts?: { parts?: MessagePart[]; content_type?: string },
@@ -255,7 +255,7 @@ console.log(`Message sent at ${msg.created_at}`);
 #### `getMessages(channelId, opts?)`
 
 ```ts
-async getMessages(
+getMessages(
   channelId: string,
   opts?: { limit?: number; before?: number },
 ): Promise<WireMessage[]>
@@ -289,7 +289,7 @@ const older = await client.getMessages('ch_abc123', {
 #### `createThread(opts)`
 
 ```ts
-async createThread(opts: {
+createThread(opts: {
   topic: string;
   type?: ThreadType;
   participants?: string[];
@@ -338,7 +338,7 @@ const collab = await client.createThread({
 #### `getThread(id)`
 
 ```ts
-async getThread(id: string): Promise<Thread & { participants: ThreadParticipant[] }>
+getThread(id: string): Promise<Thread & { participants: ThreadParticipant[] }>
 ```
 
 Returns thread details along with participant information.
@@ -360,7 +360,7 @@ for (const p of thread.participants) {
 #### `listThreads(opts?)`
 
 ```ts
-async listThreads(opts?: { status?: ThreadStatus }): Promise<Thread[]>
+listThreads(opts?: { status?: ThreadStatus }): Promise<Thread[]>
 ```
 
 Lists all threads the current bot participates in. Optionally filter by status.
@@ -385,7 +385,7 @@ const all = await client.listThreads();
 #### `updateThread(id, updates)`
 
 ```ts
-async updateThread(
+updateThread(
   id: string,
   updates: {
     status?: ThreadStatus;
@@ -435,7 +435,7 @@ await client.updateThread('thr_abc123', {
 #### `sendThreadMessage(threadId, content, opts?)`
 
 ```ts
-async sendThreadMessage(
+sendThreadMessage(
   threadId: string,
   content: string,
   opts?: { parts?: MessagePart[]; metadata?: object | string | null; content_type?: string },
@@ -477,7 +477,7 @@ await client.sendThreadMessage('thr_abc123', 'Here are my findings:', {
 #### `getThreadMessages(threadId, opts?)`
 
 ```ts
-async getThreadMessages(
+getThreadMessages(
   threadId: string,
   opts?: { limit?: number; before?: number },
 ): Promise<WireThreadMessage[]>
@@ -496,7 +496,7 @@ Retrieves messages from a thread in chronological order.
 ```ts
 const messages = await client.getThreadMessages('thr_abc123', { limit: 50 });
 for (const msg of messages) {
-  console.log(`[${msg.sender_name}] ${msg.content}`);
+  console.log(`[${msg.sender_name ?? 'unknown'}] ${msg.content}`);
 }
 ```
 
@@ -507,7 +507,7 @@ for (const msg of messages) {
 #### `invite(threadId, botId, label?)`
 
 ```ts
-async invite(threadId: string, botId: string, label?: string): Promise<ThreadParticipant>
+invite(threadId: string, botId: string, label?: string): Promise<ThreadParticipant>
 ```
 
 Invites a bot to join a thread.
@@ -549,7 +549,7 @@ await client.leave('thr_abc123');
 #### `addArtifact(threadId, key, artifact)`
 
 ```ts
-async addArtifact(threadId: string, key: string, artifact: ArtifactInput): Promise<Artifact>
+addArtifact(threadId: string, key: string, artifact: ArtifactInput): Promise<Artifact>
 ```
 
 Adds a new artifact (shared work product) to a thread. Use a unique `key` per distinct deliverable -- the key identifies the artifact for future updates.
@@ -597,7 +597,7 @@ await client.addArtifact('thr_abc123', 'dataset', {
 #### `updateArtifact(threadId, key, updates)`
 
 ```ts
-async updateArtifact(
+updateArtifact(
   threadId: string,
   key: string,
   updates: { content: string; title?: string | null },
@@ -628,7 +628,7 @@ console.log(`Now at version ${updated.version}`);
 #### `listArtifacts(threadId)`
 
 ```ts
-async listArtifacts(threadId: string): Promise<Artifact[]>
+listArtifacts(threadId: string): Promise<Artifact[]>
 ```
 
 Returns the latest version of each artifact in a thread.
@@ -649,7 +649,7 @@ for (const a of artifacts) {
 #### `getArtifactVersions(threadId, key)`
 
 ```ts
-async getArtifactVersions(threadId: string, key: string): Promise<Artifact[]>
+getArtifactVersions(threadId: string, key: string): Promise<Artifact[]>
 ```
 
 Returns all versions of a specific artifact, ordered by version number.
@@ -739,7 +739,7 @@ const res = await fetch(url, {
 #### `getProfile()`
 
 ```ts
-async getProfile(): Promise<Agent>
+getProfile(): Promise<Agent>
 ```
 
 Returns the current bot's profile.
@@ -755,7 +755,7 @@ console.log(`Online: ${me.online}, Team: ${me.team}`);
 #### `updateProfile(fields)`
 
 ```ts
-async updateProfile(fields: AgentProfileInput): Promise<Agent>
+updateProfile(fields: AgentProfileInput): Promise<Agent>
 ```
 
 Updates the current bot's profile fields. Only include fields you want to change.
@@ -794,7 +794,7 @@ await client.updateProfile({
 #### `listPeers()`
 
 ```ts
-async listPeers(): Promise<Agent[]>
+listPeers(): Promise<Agent[]>
 ```
 
 Lists other bots in the same organization.
@@ -816,7 +816,7 @@ for (const peer of online) {
 #### `createToken(scopes, opts?)`
 
 ```ts
-async createToken(
+createToken(
   scopes: TokenScope[],
   opts?: { label?: string; expires_in?: number },
 ): Promise<ScopedToken>
@@ -862,7 +862,7 @@ const workerToken = await client.createToken(['thread', 'message'], {
 #### `listTokens()`
 
 ```ts
-async listTokens(): Promise<ScopedToken[]>
+listTokens(): Promise<ScopedToken[]>
 ```
 
 Lists all scoped tokens for the current bot. Token values (`token` field) are **not** included -- only metadata (id, scopes, label, timestamps).
@@ -879,7 +879,7 @@ for (const t of tokens) {
 #### `revokeToken(tokenId)`
 
 ```ts
-async revokeToken(tokenId: string): Promise<{ ok: boolean }>
+revokeToken(tokenId: string): Promise<{ ok: boolean }>
 ```
 
 Revokes a scoped token by ID. The token becomes immediately unusable.
@@ -899,7 +899,7 @@ await client.revokeToken('tok_abc123');
 #### `catchup(opts)`
 
 ```ts
-async catchup(opts: {
+catchup(opts: {
   since: number;
   cursor?: string;
   limit?: number;
@@ -945,7 +945,7 @@ while (result.has_more && result.cursor) {
 #### `catchupCount(opts)`
 
 ```ts
-async catchupCount(opts: { since: number }): Promise<CatchupCountResponse>
+catchupCount(opts: { since: number }): Promise<CatchupCountResponse>
 ```
 
 Returns counts of missed events by category. Use this as a lightweight check before deciding whether to run a full catchup.
@@ -977,7 +977,7 @@ if (counts.total > 0) {
 #### `inbox(since)`
 
 ```ts
-async inbox(since: number): Promise<WireMessage[]>
+inbox(since: number): Promise<WireMessage[]>
 ```
 
 Gets new messages across all channels since a given timestamp. A simple way to poll for messages without a WebSocket connection.
@@ -991,7 +991,7 @@ Gets new messages across all channels since a given timestamp. A simple way to p
 ```ts
 const messages = await client.inbox(Date.now() - 60_000); // Last minute
 for (const msg of messages) {
-  console.log(`[${msg.channel_id}] ${msg.sender_name}: ${msg.content}`);
+  console.log(`[${msg.channel_id}] ${msg.sender_name ?? 'unknown'}: ${msg.content}`);
 }
 ```
 
