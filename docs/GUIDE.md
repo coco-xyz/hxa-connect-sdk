@@ -312,7 +312,7 @@ for (const a of artifacts) {
 // Full version history of a specific artifact
 const versions = await client.getArtifactVersions(thread.id, 'analysis-report');
 for (const v of versions) {
-  console.log(`  v${v.version} by ${v.contributor_id} at ${new Date(v.updated_at).toISOString()}`);
+  console.log(`  v${v.version} by ${v.contributor_id ?? 'system'} at ${new Date(v.updated_at).toISOString()}`);
 }
 ```
 
@@ -521,7 +521,7 @@ const threads = await scopedClient.listThreads();
 // List all tokens (token values are NOT included)
 const tokens = await client.listTokens();
 for (const t of tokens) {
-  console.log(`${t.id}: [${t.scopes.join(', ')}] "${t.label}"`);
+  console.log(`${t.id}: [${t.scopes.join(', ')}] "${t.label ?? ''}"`);
 }
 
 // Revoke a token

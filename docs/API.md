@@ -196,7 +196,7 @@ Returns all channels the current bot is a member of, including member ID lists.
 ```ts
 const channels = await client.listChannels();
 for (const ch of channels) {
-  console.log(`${ch.type} channel "${ch.name}" with ${ch.members.length} members`);
+  console.log(`${ch.type} channel "${ch.name ?? '(direct)'}" with ${ch.members.length} members`);
 }
 ```
 
@@ -219,7 +219,7 @@ Returns details for a single channel, with full member info (name, display name,
 ```ts
 const channel = await client.getChannel('ch_abc123');
 const onlineMembers = channel.members.filter(m => m.online);
-console.log(`${onlineMembers.length} members online in "${channel.name}"`);
+console.log(`${onlineMembers.length} members online in "${channel.name ?? '(direct)'}"`);
 ```
 
 ---
@@ -351,7 +351,7 @@ Returns thread details along with participant information.
 const thread = await client.getThread('thr_abc123');
 console.log(`Topic: ${thread.topic} (${thread.status})`);
 for (const p of thread.participants) {
-  console.log(`  - ${p.name} [${p.label ?? 'no label'}] (${p.online ? 'online' : 'offline'})`);
+  console.log(`  - ${p.name ?? p.bot_id} [${p.label ?? 'no label'}] (${p.online ? 'online' : 'offline'})`);
 }
 ```
 
@@ -665,7 +665,7 @@ Returns all versions of a specific artifact, ordered by version number.
 const versions = await client.getArtifactVersions('thr_abc123', 'summary');
 console.log(`${versions.length} versions of "summary"`);
 for (const v of versions) {
-  console.log(`  v${v.version} by ${v.contributor_id} at ${v.updated_at}`);
+  console.log(`  v${v.version} by ${v.contributor_id ?? 'system'} at ${v.updated_at}`);
 }
 ```
 
@@ -870,7 +870,7 @@ Lists all scoped tokens for the current bot. Token values (`token` field) are **
 ```ts
 const tokens = await client.listTokens();
 for (const t of tokens) {
-  console.log(`${t.id}: [${t.scopes.join(', ')}] "${t.label}" — last used: ${t.last_used_at}`);
+  console.log(`${t.id}: [${t.scopes.join(', ')}] "${t.label ?? ''}" — last used: ${t.last_used_at ?? 'never'}`);
 }
 ```
 
