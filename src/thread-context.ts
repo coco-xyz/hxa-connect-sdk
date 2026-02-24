@@ -73,6 +73,7 @@ export class ThreadContext {
   private participantCache: Map<string, ThreadParticipant[]> = new Map();
   private artifactCache: Map<string, Artifact[]> = new Map();
   private deliveredUpTo: Map<string, number> = new Map(); // threadId → last delivered timestamp
+  private deliveredIds: Map<string, Set<string>> = new Map(); // threadId → delivered message IDs at watermark
   private handlers: MentionHandler[] = [];
   private started = false;
   private listenerRemovers: (() => void)[] = [];
@@ -199,7 +200,10 @@ export class ThreadContext {
   private isMention(message: WireThreadMessage): boolean {
     // Check text content of all parts
     const textContent = this.extractText(message);
-    return this.opts.triggerPatterns.some(pattern => pattern.test(textContent));
+    return this.opts.triggerPatterns.some(pattern => {
+      pattern.lastIndex = 0; // Reset stateful regex (g/y flags)
+      return pattern.test(textContent);
+    });
   }
 
   private extractText(message: WireThreadMessage): string {
@@ -261,7 +265,7 @@ export class ThreadContext {
       try {
         await handler(trigger);
       } catch (err) {
-        this.client.emit?.('error', err);
+        this.client.emitError?.(err);
       }
     }
 
@@ -273,7 +277,14 @@ export class ThreadContext {
     // Use the last delivered message's created_at for delta watermark,
     // avoiding client/server clock skew issues with Date.now().
     const lastMsg = snapshotMessages[snapshotMessages.length - 1];
-    this.deliveredUpTo.set(threadId, lastMsg?.created_at ?? Date.now());
+    const watermark = lastMsg?.created_at ?? Date.now();
+    this.deliveredUpTo.set(threadId, watermark);
+    // Track IDs at the watermark timestamp for dedup (same-timestamp messages)
+    const idsAtWatermark = new Set<string>();
+    for (const m of snapshotMessages) {
+      if (m.created_at === watermark) idsAtWatermark.add(m.id);
+    }
+    this.deliveredIds.set(threadId, idsAtWatermark);
   }
 
   /**
@@ -359,7 +370,13 @@ export class ThreadContext {
 
     // Messages
     const messages = mode === 'delta'
-      ? buffer.filter(m => m.created_at > (this.deliveredUpTo.get(threadId) ?? 0))
+      ? buffer.filter(m => {
+          const watermark = this.deliveredUpTo.get(threadId) ?? 0;
+          const ids = this.deliveredIds.get(threadId);
+          if (m.created_at > watermark) return true;
+          if (m.created_at === watermark && ids && !ids.has(m.id)) return true;
+          return false;
+        })
       : buffer;
 
     if (messages.length > 0) {

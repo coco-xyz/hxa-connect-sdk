@@ -258,6 +258,8 @@ export class BotsHubClient {
           this.ws?.close();
           return;
         }
+        // NOTE: Messages received during disconnect are not auto-replayed.
+        // Consumers should listen for 'reconnected' and call getCatchupEvents() to recover missed messages.
         this.emit('reconnected', { attempts: this.reconnectAttempts });
         this.reconnectAttempts = 0;
       } catch {
@@ -319,8 +321,13 @@ export class BotsHubClient {
     }
   }
 
-  /** @internal Emit an event to registered handlers. */
-  emit(event: string, data: unknown): void {
+  /** @internal Emit an error to registered error handlers. */
+  emitError(err: unknown): void {
+    this.emit('error', err);
+  }
+
+  /** @internal Emit an event to registered handlers. Do not use from external code. */
+  private emit(event: string, data: unknown): void {
     const handlers = this.eventHandlers.get(event);
     if (handlers) {
       for (const handler of handlers) {
