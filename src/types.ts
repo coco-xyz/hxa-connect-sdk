@@ -10,8 +10,7 @@ export type MessagePart =
 
 // ─── Thread Types ────────────────────────────────────────────
 
-export type ThreadType = 'discussion' | 'request' | 'collab';
-export type ThreadStatus = 'open' | 'active' | 'blocked' | 'reviewing' | 'resolved' | 'closed';
+export type ThreadStatus = 'active' | 'blocked' | 'reviewing' | 'resolved' | 'closed';
 export type CloseReason = 'manual' | 'timeout' | 'error';
 export type ArtifactType = 'text' | 'markdown' | 'json' | 'code' | 'file' | 'link';
 
@@ -85,7 +84,7 @@ export interface Thread {
   id: string;
   org_id: string;
   topic: string;
-  type: ThreadType;
+  tags: string[] | null;
   status: ThreadStatus;
   initiator_id: string | null;
   channel_id: string | null;
@@ -193,6 +192,7 @@ export type CatchupEvent = CatchupEventEnvelope & (
   | { type: 'thread_message_summary'; thread_id: string; topic: string; count: number; last_at: number }
   | { type: 'thread_artifact_added'; thread_id: string; artifact_key: string; version: number }
   | { type: 'channel_message_summary'; channel_id: string; channel_name?: string; count: number; last_at: number }
+  | { type: 'thread_participant_removed'; thread_id: string; topic: string; removed_by: string }
 );
 
 export interface CatchupResponse {
@@ -209,6 +209,55 @@ export interface CatchupCountResponse {
   total: number;
 }
 
+// ─── Org Settings ───────────────────────────────────────────
+
+export interface OrgSettings {
+  org_id: string;
+  messages_per_minute_per_bot: number;
+  threads_per_hour_per_bot: number;
+  file_upload_mb_per_day_per_bot: number;
+  message_ttl_days: number | null;
+  thread_auto_close_days: number | null;
+  artifact_retention_days: number | null;
+  default_thread_permission_policy: ThreadPermissionPolicy | null;
+  updated_at: number;
+}
+
+// ─── Audit Log ──────────────────────────────────────────────
+
+export type AuditAction =
+  | 'bot.register' | 'bot.delete' | 'bot.profile_update'
+  | 'bot.token_create' | 'bot.token_revoke'
+  | 'thread.create' | 'thread.status_changed' | 'thread.invite' | 'thread.remove_participant'
+  | 'thread.permission_denied'
+  | 'message.send'
+  | 'artifact.add' | 'artifact.update'
+  | 'file.upload'
+  | 'channel.create' | 'channel.delete'
+  | 'settings.update'
+  | 'lifecycle.cleanup';
+
+export interface AuditEntry {
+  id: string;
+  org_id: string;
+  bot_id: string | null;
+  action: AuditAction;
+  target_type: string;
+  target_id: string;
+  detail: Record<string, unknown> | null;
+  created_at: number;
+}
+
+// ─── Webhook Health ─────────────────────────────────────────
+
+export interface WebhookHealth {
+  healthy: boolean;
+  last_success: number | null;
+  last_failure: number | null;
+  consecutive_failures: number;
+  degraded: boolean;
+}
+
 // ─── WebSocket Events ────────────────────────────────────────
 
 export type WsServerEvent =
@@ -216,10 +265,11 @@ export type WsServerEvent =
   | { type: 'agent_online'; agent: { id: string; name: string; display_name: string | null } }
   | { type: 'agent_offline'; agent: { id: string; name: string; display_name: string | null } }
   | { type: 'channel_created'; channel: Channel; members: string[] }
+  | { type: 'channel_deleted'; channel_id: string }
   | { type: 'thread_created'; thread: Thread }
   | { type: 'thread_updated'; thread: Thread; changes: string[] }
   | { type: 'thread_message'; thread_id: string; message: WireThreadMessage }
   | { type: 'thread_artifact'; thread_id: string; artifact: Artifact; action: 'added' | 'updated' }
-  | { type: 'thread_participant'; thread_id: string; bot_id: string; action: 'joined' | 'left' }
+  | { type: 'thread_participant'; thread_id: string; bot_id: string; bot_name: string; action: 'joined' | 'left'; by: string; label?: string | null }
   | { type: 'error'; message: string; code?: string; retry_after?: number }
   | { type: 'pong' };
