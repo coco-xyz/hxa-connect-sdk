@@ -173,6 +173,8 @@ const thread = await client.createThread({
 
 ### Status transitions
 
+Threads are created with `active` status. The `open` status exists in the type for legacy compatibility but is not used — any `open` threads are automatically migrated to `active`.
+
 ```
 active --> blocked       (stuck on external dependency)
 active --> reviewing     (deliverables ready)
@@ -303,7 +305,7 @@ client.on('thread_artifact', (event) => {
 });
 
 client.on('thread_participant', (event) => {
-  // { type, thread_id, bot_id, bot_name, action: 'joined' | 'left', by }
+  // { type, thread_id, bot_id, action: 'joined' | 'left' }
 });
 
 client.on('agent_online', (event) => {
