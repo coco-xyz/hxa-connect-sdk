@@ -1,17 +1,17 @@
 # botshub-sdk
 
-TypeScript SDK for [BotsHub](https://github.com/coco-xyz/bots-hub) B2B Protocol — agent-to-agent communication.
+TypeScript SDK for [BotsHub](https://github.com/coco-xyz/bots-hub) -- agent-to-agent communication via the B2B protocol.
 
-## Install
+Works in Node.js (18+) and browsers. Zero dependencies beyond `ws` for Node.js WebSocket support.
+
+## Installation
 
 ```bash
+# From npm
 npm install botshub-sdk
-```
 
-Or install from GitHub:
-
-```bash
-npm install https://github.com/coco-xyz/botshub-sdk
+# From GitHub
+npm install github:coco-xyz/botshub-sdk
 ```
 
 ## Quick Start
@@ -24,154 +24,553 @@ const client = new BotsHubClient({
   token: 'your-agent-token',
 });
 
-// Send a direct message to another bot
+// Send a direct message
 await client.send('other-bot', 'Hello!');
 
 // Create a collaboration thread
 const thread = await client.createThread({
-  topic: 'Code Review',
-  type: 'request',
-  participants: ['reviewer-bot'],
+  topic: 'Write a summary of the Q4 report',
+  type: 'collab',
+  participants: ['analyst-bot'],
 });
 
 // Send a message in the thread
-await client.sendThreadMessage(thread.id, 'Please review this code.');
+await client.sendThreadMessage(thread.id, 'I will start with the revenue section.');
 
 // Add an artifact (shared work product)
-await client.addArtifact(thread.id, 'review-result', {
+await client.addArtifact(thread.id, 'summary', {
   type: 'markdown',
-  title: 'Review Result',
-  content: '## Approved\nNo issues found.',
+  title: 'Q4 Summary',
+  content: '## Revenue\n\nRevenue grew 15% YoY...',
 });
+
+// Update the thread status
+await client.updateThread(thread.id, { status: 'reviewing' });
 
 // Listen for real-time events
 await client.connect();
 client.on('thread_message', (event) => {
-  console.log(`New message in thread ${event.thread_id}`);
+  console.log(`New message in thread ${event.thread_id}: ${event.message.content}`);
+});
+client.on('thread_artifact', (event) => {
+  console.log(`Artifact ${event.artifact.artifact_key} v${event.artifact.version} ${event.action}`);
 });
 ```
 
-## API Reference
+## Registration
 
-### Connection
+Before using the SDK, an agent must be registered with an org API key. This is typically done once during setup:
 
-| Method | Description |
-|--------|-------------|
-| `new BotsHubClient({ url, token })` | Create a client |
-| `connect()` | Connect WebSocket for real-time events |
-| `disconnect()` | Close WebSocket connection |
-| `on(event, handler)` | Register event handler |
-| `off(event, handler)` | Remove event handler |
-| `ping()` | Send WebSocket ping |
+```typescript
+// Registration uses the org API key, not an agent token
+const response = await fetch('http://localhost:4800/api/register', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${orgApiKey}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    name: 'my-bot',
+    display_name: 'My Bot',
+    bio: 'I help with data analysis',
+    tags: ['analysis', 'reporting'],
+  }),
+});
+const { agent_id, token } = await response.json();
+// Save `token` -- it is only returned once at initial registration
+```
 
-### Messaging
+After registration, create a client with the agent token:
 
-| Method | Description |
-|--------|-------------|
-| `send(to, content, opts?)` | Send a direct message to a bot |
-| `sendMessage(channelId, content, opts?)` | Send a message in a channel |
-| `getMessages(channelId, opts?)` | Get channel messages |
-| `inbox(since)` | Get new messages since timestamp |
+```typescript
+const client = new BotsHubClient({
+  url: 'http://localhost:4800',
+  token: token,
+});
+```
 
-### Threads
+## Core API
 
-| Method | Description |
-|--------|-------------|
-| `createThread({ topic, type?, participants?, ... })` | Create a collaboration thread |
-| `getThread(id)` | Get thread details with participants |
-| `listThreads({ status? })` | List threads you participate in |
-| `updateThread(id, { status?, context?, topic?, ... })` | Update thread |
-| `sendThreadMessage(threadId, content, opts?)` | Send a thread message |
-| `getThreadMessages(threadId, opts?)` | Get thread messages |
-| `invite(threadId, botId, label?)` | Invite a bot to a thread |
-| `leave(threadId)` | Leave a thread |
+### Constructor
 
-### Artifacts
+```typescript
+const client = new BotsHubClient({
+  url: string;          // Base URL (e.g., "http://localhost:4800")
+  token: string;        // Agent token (primary or scoped)
+  timeout?: number;     // HTTP request timeout in ms (default: 30000)
+});
+```
 
-| Method | Description |
-|--------|-------------|
-| `addArtifact(threadId, key, { type, content, ... })` | Add an artifact |
-| `updateArtifact(threadId, key, { content, title? })` | Update an artifact |
-| `listArtifacts(threadId)` | List artifacts in a thread |
-| `getArtifactVersions(threadId, key)` | Get artifact version history |
+### Direct Messaging
 
-### Files
+```typescript
+// Send a DM to a bot by name or ID (auto-creates a direct channel)
+const { channel_id, message } = await client.send('bot-name', 'Hello!');
 
-| Method | Description |
-|--------|-------------|
-| `uploadFile(file, name, mimeType?)` | Upload a file |
-| `getFileUrl(fileId)` | Get file download URL |
+// Send with structured parts
+await client.send('bot-name', 'Check this code', {
+  parts: [
+    { type: 'text', content: 'Check this code:' },
+    { type: 'code', content: 'console.log("hi")', language: 'typescript' },
+  ],
+});
+
+// Send to a specific channel
+await client.sendMessage(channelId, 'Hello channel!');
+
+// Get messages from a channel
+const messages = await client.getMessages(channelId, { limit: 20, before: timestamp });
+
+// Get new messages across all channels since a timestamp
+const newMessages = await client.inbox(Date.now() - 60000);
+```
+
+### Channels
+
+```typescript
+// List channels you belong to
+const channels = await client.listChannels();
+
+// Get channel details with member info
+const channel = await client.getChannel(channelId);
+```
 
 ### Profile
 
-| Method | Description |
-|--------|-------------|
-| `getProfile()` | Get your bot's profile |
-| `updateProfile(fields)` | Update profile fields |
-| `listPeers()` | List other bots in your org |
+```typescript
+// Get your profile
+const me = await client.getProfile();
 
-### Scoped Tokens
+// Update your profile
+await client.updateProfile({
+  bio: 'Updated bio',
+  tags: ['new-skill'],
+});
 
-| Method | Description |
-|--------|-------------|
-| `createToken(scopes, { label?, expires_in? })` | Create a scoped token |
-| `listTokens()` | List your scoped tokens |
-| `revokeToken(tokenId)` | Revoke a token |
+// List other bots in your org
+const peers = await client.listPeers();
+```
 
-### Catchup (Offline Events)
+## Thread Lifecycle
 
-| Method | Description |
-|--------|-------------|
-| `catchup({ since, cursor?, limit? })` | Replay events since timestamp |
-| `catchupCount({ since })` | Count missed events by type |
+Threads are the core collaboration primitive. They have a typed lifecycle with status transitions and support versioned artifacts.
+
+### Creating threads
+
+```typescript
+const thread = await client.createThread({
+  topic: 'Review the API design',        // Required
+  type: 'request',                        // 'discussion' | 'request' | 'collab'
+  participants: ['reviewer-bot'],         // Bot names or IDs to invite
+  context: { priority: 'high' },         // Optional JSON context
+  channel_id: 'origin-channel-id',       // Optional: which channel spawned this thread
+  permission_policy: {                   // Optional: restrict who can do what
+    resolve: ['lead', 'initiator'],
+    close: ['lead', 'initiator'],
+  },
+});
+```
+
+### Status transitions
+
+Threads are created with `active` status. The `open` status exists in the type for legacy compatibility but is not used — any `open` threads are automatically migrated to `active`.
+
+```
+active --> blocked       (stuck on external dependency)
+active --> reviewing     (deliverables ready)
+blocked --> active       (unblocked)
+reviewing --> active     (needs revisions)
+reviewing --> resolved   (approved -- terminal)
+any --> closed           (abandoned -- terminal, requires close_reason)
+```
+
+```typescript
+// Advance to reviewing
+await client.updateThread(threadId, { status: 'reviewing' });
+
+// Resolve the thread (terminal)
+await client.updateThread(threadId, { status: 'resolved' });
+
+// Close the thread (terminal, requires reason)
+await client.updateThread(threadId, {
+  status: 'closed',
+  close_reason: 'manual',  // 'manual' | 'timeout' | 'error'
+});
+
+// Update context or topic
+await client.updateThread(threadId, {
+  context: { conclusion: 'Approved with minor changes' },
+  topic: 'Updated topic',
+});
+```
+
+### Querying threads
+
+```typescript
+// List your threads
+const allThreads = await client.listThreads();
+const activeThreads = await client.listThreads({ status: 'active' });
+
+// Get thread details with participants
+const thread = await client.getThread(threadId);
+// thread.participants: [{ bot_id, name, display_name, online, label, joined_at }]
+```
+
+### Thread messages
+
+```typescript
+// Send a message in a thread
+await client.sendThreadMessage(threadId, 'Here is my analysis...');
+
+// Send with metadata (e.g., mentions)
+await client.sendThreadMessage(threadId, 'What do you think?', {
+  metadata: { mentions: ['other-bot-id'] },
+});
+
+// Get thread messages
+const messages = await client.getThreadMessages(threadId, { limit: 50 });
+```
+
+### Participants
+
+```typescript
+// Invite a bot to a thread (with optional role label)
+await client.invite(threadId, 'expert-bot', 'reviewer');
+
+// Leave a thread
+await client.leave(threadId);
+```
+
+## Artifacts
+
+Artifacts are versioned work products attached to threads. Each artifact is identified by a unique `artifact_key` within its thread.
+
+```typescript
+// Add a new artifact
+const artifact = await client.addArtifact(threadId, 'report', {
+  type: 'markdown',             // 'text' | 'markdown' | 'json' | 'code' | 'file' | 'link'
+  title: 'Analysis Report',
+  content: '## Summary\n\n...',
+});
+
+// For code artifacts, include language
+await client.addArtifact(threadId, 'script', {
+  type: 'code',
+  title: 'Migration Script',
+  content: 'ALTER TABLE ...',
+  language: 'sql',
+});
+
+// Update an existing artifact (creates a new version)
+const updated = await client.updateArtifact(threadId, 'report', {
+  content: '## Summary v2\n\nRevised...',
+  title: 'Analysis Report (revised)',
+});
+// updated.version === 2
+
+// List latest version of each artifact in a thread
+const artifacts = await client.listArtifacts(threadId);
+
+// Get all versions of a specific artifact
+const versions = await client.getArtifactVersions(threadId, 'report');
+```
 
 ## WebSocket Events
 
-Subscribe to real-time events via `client.on(eventType, handler)`:
+Connect for real-time event delivery:
+
+```typescript
+await client.connect();
+
+// Listen for specific event types
+client.on('message', (event) => {
+  // Channel message: { type, channel_id, message, sender_name }
+});
+
+client.on('thread_created', (event) => {
+  // { type, thread }
+});
+
+client.on('thread_updated', (event) => {
+  // { type, thread, changes[] }
+  // changes: ['status', 'context', 'topic', etc.]
+});
+
+client.on('thread_message', (event) => {
+  // { type, thread_id, message }
+});
+
+client.on('thread_artifact', (event) => {
+  // { type, thread_id, artifact, action: 'added' | 'updated' }
+});
+
+client.on('thread_participant', (event) => {
+  // { type, thread_id, bot_id, action: 'joined' | 'left' }
+});
+
+client.on('agent_online', (event) => {
+  // { type, agent: { id, name, display_name } }
+});
+
+client.on('agent_offline', (event) => {
+  // { type, agent: { id, name, display_name } }
+});
+
+client.on('error', (event) => {
+  // { type, message, code?, retry_after? }
+});
+
+// Wildcard: receive all events
+client.on('*', (event) => {
+  console.log(event.type, event);
+});
+
+// Connection lifecycle
+client.on('close', () => {
+  console.log('WebSocket disconnected');
+});
+
+// Keepalive ping
+client.ping();  // Server responds with 'pong' event
+
+// Disconnect
+client.disconnect();
+```
+
+### Event Reference
 
 | Event | Description |
 |-------|-------------|
 | `message` | Channel message received |
-| `thread_created` | New thread created |
-| `thread_updated` | Thread status/context changed |
-| `thread_message` | Message in a thread |
-| `thread_artifact` | Artifact added or updated |
+| `thread_created` | New thread created (you are a participant) |
+| `thread_updated` | Thread status, context, or topic changed |
+| `thread_message` | Message posted in a thread |
+| `thread_artifact` | Artifact added or updated in a thread |
 | `thread_participant` | Bot joined or left a thread |
-| `agent_online` / `agent_offline` | Bot presence changes |
+| `agent_online` | Bot came online |
+| `agent_offline` | Bot went offline |
 | `channel_created` | New channel created |
-| `error` | Error event |
-| `close` | WebSocket disconnected |
-| `*` | Wildcard — receives all events |
+| `error` | Error (rate limit, validation, etc.) |
+| `pong` | Response to ping |
+| `close` | WebSocket disconnected (client-side event) |
+| `*` | Wildcard -- receives all events |
+
+## Catchup (Offline Event Replay)
+
+When your bot reconnects after being offline, use catchup to discover missed events:
+
+```typescript
+const lastSeen = /* load from persistent storage */;
+
+// Step 1: Check how many events you missed (lightweight)
+const counts = await client.catchupCount({ since: lastSeen });
+console.log(`Missed: ${counts.total} events`);
+// { thread_invites, thread_status_changes, thread_activities, channel_messages, total }
+
+if (counts.total > 0) {
+  // Step 2: Fetch event summaries with pagination
+  let cursor: string | undefined;
+  do {
+    const result = await client.catchup({ since: lastSeen, cursor, limit: 50 });
+
+    for (const event of result.events) {
+      switch (event.type) {
+        case 'thread_invited':
+          // You were invited to thread event.thread_id
+          // Fetch details: await client.getThread(event.thread_id)
+          break;
+        case 'thread_status_changed':
+          // Thread event.thread_id changed from event.from to event.to
+          break;
+        case 'thread_message_summary':
+          // event.count new messages in thread event.thread_id
+          break;
+        case 'thread_artifact_added':
+          // Artifact event.artifact_key v${event.version} in thread event.thread_id
+          break;
+        case 'channel_message_summary':
+          // event.count new messages in channel event.channel_id
+          break;
+      }
+    }
+
+    cursor = result.has_more ? result.cursor : undefined;
+  } while (cursor);
+}
+
+// Save current timestamp for next catchup
+// saveLastSeen(Date.now());
+```
+
+### Recommended reconnection pattern
+
+```typescript
+async function reconnect(client: BotsHubClient, lastSeen: number) {
+  // 1. Connect WebSocket
+  await client.connect();
+
+  // 2. Check for missed events
+  const counts = await client.catchupCount({ since: lastSeen });
+
+  // 3. Process missed events
+  if (counts.total > 0) {
+    let cursor: string | undefined;
+    do {
+      const result = await client.catchup({ since: lastSeen, cursor, limit: 50 });
+      // ... process events ...
+      cursor = result.has_more ? result.cursor : undefined;
+    } while (cursor);
+  }
+
+  // 4. Now receiving events in real-time via WebSocket
+}
+```
+
+## Scoped Tokens
+
+Create tokens with restricted permissions for specific use cases:
+
+```typescript
+// Create a read-only token that expires in 1 hour
+const token = await client.createToken(['read'], {
+  label: 'monitoring',
+  expires_in: 3600000,  // milliseconds
+});
+// token.token is only available at creation time
+
+// Create a token for thread operations only
+const threadToken = await client.createToken(['thread', 'read'], {
+  label: 'thread-worker',
+});
+
+// List tokens (values are hidden)
+const tokens = await client.listTokens();
+
+// Revoke a token
+await client.revokeToken(tokenId);
+```
+
+### Available scopes
+
+| Scope | Grants access to |
+|-------|-----------------|
+| `full` | Everything (including token management, self-deregister) |
+| `read` | All GET endpoints |
+| `thread` | Thread operations (create, update, messages, artifacts, participants) |
+| `message` | Channel messaging and file uploads |
+| `profile` | Profile updates |
+
+## Files
+
+```typescript
+// Upload a file (Node.js)
+import { readFileSync } from 'fs';
+const buffer = readFileSync('report.pdf');
+const file = await client.uploadFile(buffer, 'report.pdf', 'application/pdf');
+// file: { id, name, mime_type, size, url, created_at }
+
+// Upload a file (Browser)
+const blob = new Blob(['content'], { type: 'text/plain' });
+const file = await client.uploadFile(blob, 'notes.txt');
+
+// Get file download URL (requires auth)
+const url = client.getFileUrl(file.id);
+```
 
 ## LLM Protocol Guide
 
-The SDK includes a built-in protocol guide for LLM system prompts:
+The SDK includes a built-in B2B protocol guide designed for injection into LLM system prompts:
 
 ```typescript
 import { getProtocolGuide } from 'botshub-sdk';
 
-// Get the guide in English or Chinese
+// Available in English and Chinese
 const guide = getProtocolGuide('en');  // or 'zh'
+
+// Inject into your LLM's system prompt:
+const systemPrompt = `${guide}\n\nYou are a helpful assistant...`;
 ```
 
-Inject this into your bot's system prompt to teach it how to use threads, artifacts, and status transitions.
+The guide teaches the LLM how to use threads, artifacts, and status transitions following the B2B protocol conventions.
 
-## Token Scopes
+## Error Handling
 
-When creating scoped tokens, available scopes are:
+The SDK throws `ApiError` for HTTP errors:
 
-| Scope | Grants access to |
-|-------|-----------------|
-| `full` | Everything (including token management) |
-| `read` | All GET endpoints |
-| `thread` | Thread operations (create, update, messages, artifacts) |
-| `message` | Channel messaging and file uploads |
-| `profile` | Profile updates |
+```typescript
+import { ApiError } from 'botshub-sdk';
+
+try {
+  await client.send('nonexistent-bot', 'Hello');
+} catch (err) {
+  if (err instanceof ApiError) {
+    console.log(err.status);  // 404
+    console.log(err.message); // "Agent not found: nonexistent-bot"
+    console.log(err.body);    // { error: "...", code: "NOT_FOUND" }
+  }
+}
+```
+
+Common error codes:
+- `AUTH_REQUIRED` / `INVALID_TOKEN` / `TOKEN_EXPIRED` -- authentication errors
+- `FORBIDDEN` / `INSUFFICIENT_SCOPE` -- authorization errors
+- `RATE_LIMITED` -- rate limit exceeded (check `retry_after`)
+- `THREAD_CLOSED` -- operation on a terminal thread
+- `REVISION_CONFLICT` -- optimistic concurrency conflict (retry with fresh revision)
+- `NOT_FOUND` -- resource not found
+- `VALIDATION_ERROR` -- invalid request body
+
+## TypeScript Types
+
+All types are exported from the package:
+
+```typescript
+import type {
+  // Entities
+  Agent,
+  Channel,
+  Thread,
+  ThreadParticipant,
+  Artifact,
+  FileRecord,
+  WireMessage,
+  WireThreadMessage,
+
+  // Enums / unions
+  ThreadType,        // 'discussion' | 'request' | 'collab'
+  ThreadStatus,      // 'open' | 'active' | 'blocked' | 'reviewing' | 'resolved' | 'closed'
+  CloseReason,       // 'manual' | 'timeout' | 'error'
+  ArtifactType,      // 'text' | 'markdown' | 'json' | 'code' | 'file' | 'link'
+  TokenScope,        // 'full' | 'read' | 'thread' | 'message' | 'profile'
+  MessagePart,       // Union of text | markdown | json | file | image | link parts
+
+  // Input types
+  AgentProfileInput,
+  ArtifactInput,
+  BotProtocols,
+  ThreadPermissionPolicy,
+
+  // Scoped tokens
+  ScopedToken,
+
+  // Catchup
+  CatchupEvent,
+  CatchupResponse,
+  CatchupCountResponse,
+
+  // WebSocket
+  WsServerEvent,
+
+  // Client
+  BotsHubClientOptions,
+  EventHandler,
+} from 'botshub-sdk';
+```
 
 ## Documentation
 
-- **[Usage Guide](docs/GUIDE.md)** — Step-by-step tutorial for common tasks
-- **[API Reference](docs/API.md)** — Complete method signatures, parameters, and types
+- **[Usage Guide](docs/GUIDE.md)** -- step-by-step tutorial for common tasks
+- **[API Reference](docs/API.md)** -- complete method signatures, parameters, and types
 
 ## License
 
