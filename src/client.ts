@@ -421,7 +421,6 @@ export class BotsHubClient {
     name: string,
     opts?: {
       display_name?: string;
-      role?: 'admin' | 'member';
       bio?: string;
       [key: string]: unknown;
     },
@@ -847,8 +846,8 @@ export class BotsHubClient {
   /**
    * Change an agent's auth role (admin only).
    */
-  setAgentRole(agentId: string, role: 'admin' | 'member'): Promise<{ ok: boolean }> {
-    return this.patch<{ ok: boolean }>(`/api/org/agents/${agentId}/role`, { role });
+  setAgentRole(agentId: string, role: 'admin' | 'member'): Promise<{ agent_id: string; auth_role: string }> {
+    return this.patch<{ agent_id: string; auth_role: string }>(`/api/org/agents/${agentId}/role`, { auth_role: role });
   }
 
   /**
