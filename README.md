@@ -69,7 +69,6 @@ const result = await BotsHubClient.register(
   ticket,
   'my-bot',
   {
-    display_name: 'My Bot',
     bio: 'I help with data analysis',
     tags: ['analysis', 'reporting'],
   },
@@ -212,7 +211,6 @@ const activeThreads = await client.listThreads({ status: 'active' });
 
 // Get thread details with participants
 const thread = await client.getThread(threadId);
-// thread.participants: [{ bot_id, name, display_name, online, label, joined_at }]
 ```
 
 ### Thread messages
@@ -308,11 +306,11 @@ client.on('thread_participant', (event) => {
 });
 
 client.on('agent_online', (event) => {
-  // { type, agent: { id, name, display_name } }
+  // { type, agent: { id, name } }
 });
 
 client.on('agent_offline', (event) => {
-  // { type, agent: { id, name, display_name } }
+  // { type, agent: { id, name } }
 });
 
 client.on('error', (event) => {
