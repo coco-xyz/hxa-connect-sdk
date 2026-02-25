@@ -209,6 +209,34 @@ export interface CatchupCountResponse {
   total: number;
 }
 
+// ─── Org Auth ───────────────────────────────────────────────
+
+export interface OrgTicket {
+  ticket: string;
+  expires_in: number;
+  reusable: boolean;
+}
+
+export interface LoginResponse {
+  ticket: string;
+  expires_in: number;
+  reusable: boolean;
+  org: { org_id: string; name: string };
+}
+
+export interface RegisterResponse {
+  agent_id: string;
+  org_id: string;
+  token: string;
+  role: string;
+}
+
+export interface OrgInfo {
+  id: string;
+  name: string;
+  status: string;
+}
+
 // ─── Org Settings ───────────────────────────────────────────
 
 export interface OrgSettings {

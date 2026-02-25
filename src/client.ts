@@ -8,7 +8,11 @@ import type {
   Channel,
   CloseReason,
   FileRecord,
+  LoginResponse,
   MessagePart,
+  OrgInfo,
+  OrgTicket,
+  RegisterResponse,
   ScopedToken,
   Thread,
   ThreadParticipant,
@@ -96,6 +100,8 @@ export interface BotsHubClientOptions {
   url: string;
   /** Agent authentication token */
   token: string;
+  /** Org ID — if set, sent as X-Org-Id header on all requests */
+  orgId?: string;
   /** HTTP request timeout in milliseconds (default: 30000) */
   timeout?: number;
   /** Auto-reconnect configuration */
@@ -109,6 +115,7 @@ export type EventHandler = (data: any) => void;
 export class BotsHubClient {
   private readonly baseUrl: string;
   private readonly token: string;
+  private readonly orgId: string | undefined;
   private readonly timeout: number;
   private ws: WebSocketLike | null = null;
   private eventHandlers: Map<string, Set<EventHandler>> = new Map();
@@ -126,6 +133,7 @@ export class BotsHubClient {
     // Strip trailing slash
     this.baseUrl = options.url.replace(/\/+$/, '');
     this.token = options.token;
+    this.orgId = options.orgId;
     this.timeout = options.timeout ?? 30_000;
 
     const rc = options.reconnect ?? {};
@@ -146,6 +154,10 @@ export class BotsHubClient {
       'Authorization': `Bearer ${this.token}`,
       ...opts.headers,
     };
+
+    if (this.orgId) {
+      headers['X-Org-Id'] = this.orgId;
+    }
 
     const init: RequestInit = {
       method: opts.method || 'GET',
@@ -364,6 +376,72 @@ export class BotsHubClient {
     if (this.ws && this.ws.readyState === WS_OPEN) {
       this.ws.send(JSON.stringify({ type: 'ping' }));
     }
+  }
+
+  // ─── Static Auth Methods ─────────────────────────────────
+
+  /**
+   * Login to a BotsHub org and get a ticket for agent registration.
+   * This is typically used by humans or automation to onboard new agents.
+   */
+  static async login(
+    url: string,
+    orgId: string,
+    orgSecret: string,
+    opts?: { reusable?: boolean; expires_in?: number },
+  ): Promise<LoginResponse> {
+    const baseUrl = url.replace(/\/+$/, '');
+    const body: Record<string, unknown> = { org_id: orgId, org_secret: orgSecret };
+    if (opts?.reusable !== undefined) body.reusable = opts.reusable;
+    if (opts?.expires_in !== undefined) body.expires_in = opts.expires_in;
+
+    const response = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      let respBody: unknown;
+      try { respBody = await response.json(); } catch { respBody = await response.text().catch(() => null); }
+      throw new ApiError(response.status, respBody);
+    }
+
+    return response.json() as Promise<LoginResponse>;
+  }
+
+  /**
+   * Register a new agent in a BotsHub org using a ticket.
+   * Returns agent info and token. Use the token to create a BotsHubClient.
+   */
+  static async register(
+    url: string,
+    orgId: string,
+    ticket: string,
+    name: string,
+    opts?: {
+      display_name?: string;
+      role?: 'admin' | 'member';
+      bio?: string;
+      [key: string]: unknown;
+    },
+  ): Promise<RegisterResponse> {
+    const baseUrl = url.replace(/\/+$/, '');
+    const body: Record<string, unknown> = { org_id: orgId, ticket, name, ...opts };
+
+    const response = await fetch(`${baseUrl}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      let respBody: unknown;
+      try { respBody = await response.json(); } catch { respBody = await response.text().catch(() => null); }
+      throw new ApiError(response.status, respBody);
+    }
+
+    return response.json() as Promise<RegisterResponse>;
   }
 
   // ─── Channels ────────────────────────────────────────────
@@ -623,11 +701,16 @@ export class BotsHubClient {
       formData.append('file', blob, name);
     }
 
+    const uploadHeaders: Record<string, string> = {
+      'Authorization': `Bearer ${this.token}`,
+    };
+    if (this.orgId) {
+      uploadHeaders['X-Org-Id'] = this.orgId;
+    }
+
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.token}`,
-      },
+      headers: uploadHeaders,
       body: formData,
       signal: AbortSignal.timeout(this.timeout),
     });
@@ -743,5 +826,35 @@ export class BotsHubClient {
    */
   inbox(since: number): Promise<WireMessage[]> {
     return this.get<WireMessage[]>(`/api/inbox?since=${since}`);
+  }
+
+  // ─── Org Admin ──────────────────────────────────────────
+
+  /**
+   * Create an org ticket for agent registration (admin only).
+   */
+  createOrgTicket(opts?: { reusable?: boolean; expires_in?: number }): Promise<OrgTicket> {
+    return this.post<OrgTicket>('/api/org/tickets', opts);
+  }
+
+  /**
+   * Rotate the org secret (admin only). Returns the new plaintext secret.
+   */
+  rotateOrgSecret(): Promise<{ org_secret: string }> {
+    return this.post<{ org_secret: string }>('/api/org/rotate-secret');
+  }
+
+  /**
+   * Change an agent's auth role (admin only).
+   */
+  setAgentRole(agentId: string, role: 'admin' | 'member'): Promise<{ ok: boolean }> {
+    return this.patch<{ ok: boolean }>(`/api/org/agents/${agentId}/role`, { role });
+  }
+
+  /**
+   * Get current org information.
+   */
+  getOrgInfo(): Promise<OrgInfo> {
+    return this.get<OrgInfo>('/api/org');
   }
 }
