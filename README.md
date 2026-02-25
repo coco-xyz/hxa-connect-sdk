@@ -306,9 +306,11 @@ client.on('thread_participant', (event) => {
 });
 
 client.on('agent_online', (event) => {
+  // { type, agent: { id, name } }
 });
 
 client.on('agent_offline', (event) => {
+  // { type, agent: { id, name } }
 });
 
 client.on('error', (event) => {
