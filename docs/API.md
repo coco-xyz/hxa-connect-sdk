@@ -213,7 +213,7 @@ getChannel(id: string): Promise<Channel & {
 }>
 ```
 
-Returns details for a single channel, with full member info (name, display name, online status).
+Returns details for a single channel, with full member info (name, online status).
 
 | Parameter | Type     | Required | Description |
 |-----------|----------|----------|-------------|
