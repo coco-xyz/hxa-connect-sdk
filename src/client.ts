@@ -39,8 +39,10 @@ const WS_OPEN = 1;
 /**
  * Create a WebSocket connection. Uses the `ws` package in Node.js
  * and the native WebSocket in browsers.
+ * @param url - WebSocket URL to connect to
+ * @param wsOptions - Options passed to the ws constructor (Node.js only, e.g. { agent: proxyAgent })
  */
-async function createWebSocket(url: string): Promise<WebSocketLike> {
+async function createWebSocket(url: string, wsOptions?: Record<string, unknown>): Promise<WebSocketLike> {
   // Browser environment
   if (typeof globalThis.WebSocket !== 'undefined') {
     return new Promise<WebSocketLike>((resolve, reject) => {
@@ -53,7 +55,7 @@ async function createWebSocket(url: string): Promise<WebSocketLike> {
   // Node.js environment — dynamic import ws
   const { default: WS } = await import('ws');
   return new Promise<WebSocketLike>((resolve, reject) => {
-    const socket = new WS(url);
+    const socket = new WS(url, wsOptions);
     socket.on('open', () => resolve(socket as unknown as WebSocketLike));
     socket.on('error', (e: Error) => reject(new Error(`WebSocket connection failed: ${e.message}`)));
   });
@@ -106,6 +108,8 @@ export interface BotsHubClientOptions {
   timeout?: number;
   /** Auto-reconnect configuration */
   reconnect?: ReconnectOptions;
+  /** Options passed to the WebSocket constructor (Node.js only, e.g. { agent: proxyAgent }) */
+  wsOptions?: Record<string, unknown>;
 }
 
 // ─── Main Client ─────────────────────────────────────────────
@@ -117,6 +121,7 @@ export class BotsHubClient {
   private readonly token: string;
   private readonly orgId: string | undefined;
   private readonly timeout: number;
+  private readonly wsOptions: Record<string, unknown> | undefined;
   private ws: WebSocketLike | null = null;
   private eventHandlers: Map<string, Set<EventHandler>> = new Map();
   private cachedBotId: string | null = null;
@@ -135,6 +140,7 @@ export class BotsHubClient {
     this.token = options.token;
     this.orgId = options.orgId;
     this.timeout = options.timeout ?? 30_000;
+    this.wsOptions = options.wsOptions;
 
     const rc = options.reconnect ?? {};
     this.reconnectOpts = {
@@ -222,8 +228,11 @@ export class BotsHubClient {
   }
 
   private async doConnect(): Promise<void> {
-    const wsUrl = this.baseUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:') + `/ws?token=${encodeURIComponent(this.token)}`;
-    this.ws = await createWebSocket(wsUrl);
+    // Exchange bearer token for a one-time WS ticket (avoids token in URL)
+    const { ticket } = await this.post<{ ticket: string }>('/api/ws-ticket');
+    const wsBase = this.baseUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
+    const wsUrl = `${wsBase}/ws?ticket=${encodeURIComponent(ticket)}`;
+    this.ws = await createWebSocket(wsUrl, this.wsOptions);
 
     this.ws.addEventListener('message', (event: any) => {
       const data = typeof event.data === 'string' ? event.data : event.data?.toString?.();

@@ -22,7 +22,10 @@ Creates a new client instance. No network requests are made until you call a met
 |-----------|----------|----------|---------|-------------|
 | `url`     | `string` | Yes      | --      | Base URL of the BotsHub server (e.g. `"http://localhost:4800"`). Trailing slashes are stripped automatically. |
 | `token`   | `string` | Yes      | --      | Agent authentication token. Sent as `Authorization: Bearer <token>` on every request. |
+| `orgId`   | `string` | No       | --      | Org ID. If set, sent as `X-Org-Id` header on all requests. |
 | `timeout` | `number` | No       | `30000` | HTTP request timeout in milliseconds. Applied via `AbortSignal.timeout()`. |
+| `reconnect` | `ReconnectOptions` | No | `{ enabled: true, initialDelay: 1000, maxDelay: 30000, backoffFactor: 2, maxAttempts: Infinity }` | Auto-reconnect configuration. |
+| `wsOptions` | `Record<string, unknown>` | No | -- | Options passed to the `ws` WebSocket constructor (Node.js only, e.g. `{ agent: proxyAgent }` for proxy support). |
 
 ```ts
 import { BotsHubClient } from 'botshub-sdk';
@@ -46,7 +49,7 @@ async connect(): Promise<void>
 
 Opens a WebSocket connection to receive real-time events. If already connected, this is a no-op.
 
-The WebSocket URL is derived from the base URL by replacing `http://` with `ws://` (or `https://` with `wss://`) and appending `/ws?token=<token>`. In Node.js the `ws` package is used; in browsers the native `WebSocket` API is used.
+Internally, `connect()` exchanges the bearer token for a one-time WS ticket via `POST /api/ws-ticket`, then opens the WebSocket at `ws(s)://<host>/ws?ticket=<ticket>`. This avoids exposing the long-lived token in the URL. In Node.js the `ws` package is used; in browsers the native `WebSocket` API is used.
 
 After connecting, register event handlers with `.on()` to receive events.
 
