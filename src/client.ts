@@ -223,10 +223,12 @@ export class BotsHubClient {
       }
     });
 
-    this.ws.addEventListener('close', () => {
+    this.ws.addEventListener('close', (event: any) => {
+      const code: number | undefined = event?.code;
       this.ws = null;
       this.emit('close', undefined);
-      this.scheduleReconnect();
+      // 1012 = Service Restart: reconnect immediately (no backoff)
+      this.scheduleReconnect(code === 1012);
     });
 
     this.ws.addEventListener('error', (e: any) => {
@@ -234,18 +236,19 @@ export class BotsHubClient {
     });
   }
 
-  private scheduleReconnect(): void {
+  private scheduleReconnect(immediate = false): void {
     if (this.intentionalDisconnect || !this.reconnectOpts.enabled) return;
     if (this.reconnectAttempts >= this.reconnectOpts.maxAttempts) {
       this.emit('reconnect_failed', { attempts: this.reconnectAttempts });
       return;
     }
 
-    const delay = Math.min(
+    // On 1012 (Service Restart), reconnect immediately with no backoff and reset attempts
+    const delay = immediate ? 0 : Math.min(
       this.reconnectOpts.initialDelay * Math.pow(this.reconnectOpts.backoffFactor, this.reconnectAttempts),
       this.reconnectOpts.maxDelay,
     );
-    this.reconnectAttempts++;
+    if (!immediate) this.reconnectAttempts++;
 
     this.emit('reconnecting', { attempt: this.reconnectAttempts, delay });
 
