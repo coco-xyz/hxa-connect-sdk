@@ -117,6 +117,8 @@ export class BotsHubClient {
   // E1: Auto-reconnect state
   private readonly reconnectOpts: Required<ReconnectOptions>;
   private reconnectAttempts = 0;
+  private immediateReconnects = 0;
+  private readonly maxImmediateReconnects = 3;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private intentionalDisconnect = false;
 
@@ -201,6 +203,7 @@ export class BotsHubClient {
 
     this.intentionalDisconnect = false;
     this.reconnectAttempts = 0;
+    this.immediateReconnects = 0;
     this.clearReconnectTimer();
 
     await this.doConnect();
@@ -223,10 +226,12 @@ export class BotsHubClient {
       }
     });
 
-    this.ws.addEventListener('close', () => {
+    this.ws.addEventListener('close', (event: any) => {
+      const code: number | undefined = event?.code;
       this.ws = null;
       this.emit('close', undefined);
-      this.scheduleReconnect();
+      // 1012 = Service Restart: reconnect immediately (no backoff)
+      this.scheduleReconnect(code === 1012);
     });
 
     this.ws.addEventListener('error', (e: any) => {
@@ -234,20 +239,28 @@ export class BotsHubClient {
     });
   }
 
-  private scheduleReconnect(): void {
+  private scheduleReconnect(immediate = false): void {
     if (this.intentionalDisconnect || !this.reconnectOpts.enabled) return;
     if (this.reconnectAttempts >= this.reconnectOpts.maxAttempts) {
       this.emit('reconnect_failed', { attempts: this.reconnectAttempts });
       return;
     }
 
-    const delay = Math.min(
+    // Cap consecutive immediate reconnects to prevent storm on repeated 1012
+    const doImmediate = immediate && this.immediateReconnects < this.maxImmediateReconnects;
+
+    const delay = doImmediate ? 0 : Math.min(
       this.reconnectOpts.initialDelay * Math.pow(this.reconnectOpts.backoffFactor, this.reconnectAttempts),
       this.reconnectOpts.maxDelay,
     );
-    this.reconnectAttempts++;
+    if (doImmediate) {
+      this.immediateReconnects++;
+    } else {
+      this.reconnectAttempts++;
+      this.immediateReconnects = 0;
+    }
 
-    this.emit('reconnecting', { attempt: this.reconnectAttempts, delay });
+    this.emit('reconnecting', { attempt: this.reconnectAttempts || this.immediateReconnects, delay });
 
     this.reconnectTimer = setTimeout(async () => {
       if (this.intentionalDisconnect) return;
@@ -260,8 +273,9 @@ export class BotsHubClient {
         }
         // NOTE: Messages received during disconnect are not auto-replayed.
         // Consumers should listen for 'reconnected' and call getCatchupEvents() to recover missed messages.
-        this.emit('reconnected', { attempts: this.reconnectAttempts });
+        this.emit('reconnected', { attempts: this.reconnectAttempts || this.immediateReconnects });
         this.reconnectAttempts = 0;
+        this.immediateReconnects = 0;
       } catch {
         this.scheduleReconnect();
       }
