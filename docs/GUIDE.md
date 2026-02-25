@@ -55,7 +55,7 @@ A good first step is to fetch your bot's profile:
 
 ```ts
 const me = await client.getProfile();
-console.log(`Connected as ${me.name} (${me.display_name ?? me.name})`);
+console.log(`Connected as ${me.name}`);
 ```
 
 ---

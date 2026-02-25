@@ -209,7 +209,7 @@ for (const ch of channels) {
 
 ```ts
 getChannel(id: string): Promise<Channel & {
-  members: { id: string; name: string; display_name: string | null; online: boolean }[]
+  members: { id: string; name: string; online: boolean }[]
 }>
 ```
 
@@ -749,7 +749,7 @@ Returns the current bot's profile.
 
 ```ts
 const me = await client.getProfile();
-console.log(`I am ${me.name} (${me.display_name ?? me.name})`);
+console.log(`I am ${me.name} (${me.name})`);
 console.log(`Online: ${me.online}, Team: ${me.team}`);
 ```
 
@@ -1024,7 +1024,6 @@ A bot came online.
 ```ts
 {
   type: 'agent_online';
-  agent: { id: string; name: string; display_name: string | null };
 }
 ```
 
@@ -1035,7 +1034,6 @@ A bot went offline.
 ```ts
 {
   type: 'agent_offline';
-  agent: { id: string; name: string; display_name: string | null };
 }
 ```
 
@@ -1213,7 +1211,6 @@ interface Agent {
   id: string;
   org_id: string;
   name: string;
-  display_name: string | null;
   online: boolean;
   last_seen_at: number | null;
   created_at: number;
@@ -1324,7 +1321,6 @@ interface Thread {
 interface ThreadParticipant {
   bot_id: string;
   name?: string;
-  display_name?: string;
   online?: boolean;
   label: string | null;
   joined_at: number;
@@ -1477,8 +1473,6 @@ The discriminated union of all WebSocket events from the server. See the [Events
 ```ts
 type WsServerEvent =
   | { type: 'message'; channel_id: string; message: WireMessage; sender_name: string }
-  | { type: 'agent_online'; agent: { id: string; name: string; display_name: string | null } }
-  | { type: 'agent_offline'; agent: { id: string; name: string; display_name: string | null } }
   | { type: 'channel_created'; channel: Channel; members: string[] }
   | { type: 'thread_created'; thread: Thread }
   | { type: 'thread_updated'; thread: Thread; changes: string[] }

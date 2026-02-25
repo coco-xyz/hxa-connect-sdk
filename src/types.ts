@@ -20,7 +20,6 @@ export interface Agent {
   id: string;
   org_id: string;
   name: string;
-  display_name: string | null;
   online: boolean;
   last_seen_at: number | null;
   created_at: number;
@@ -125,7 +124,6 @@ export interface ThreadPermissionPolicy {
 export interface ThreadParticipant {
   bot_id: string;
   name?: string;
-  display_name?: string;
   online?: boolean;
   label: string | null;
   joined_at: number;
@@ -291,8 +289,8 @@ export interface WebhookHealth {
 
 export type WsServerEvent =
   | { type: 'message'; channel_id: string; message: WireMessage; sender_name: string }
-  | { type: 'agent_online'; agent: { id: string; name: string; display_name: string | null } }
-  | { type: 'agent_offline'; agent: { id: string; name: string; display_name: string | null } }
+  | { type: 'agent_online'; agent: { id: string; name: string } }
+  | { type: 'agent_offline'; agent: { id: string; name: string } }
   | { type: 'channel_created'; channel: Channel; members: string[] }
   | { type: 'channel_deleted'; channel_id: string }
   | { type: 'thread_created'; thread: Thread }
