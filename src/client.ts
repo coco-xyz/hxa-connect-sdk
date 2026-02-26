@@ -852,10 +852,10 @@ export class HxaConnectClient {
   }
 
   /**
-   * Change an agent's auth role (admin only).
+   * Change a bot's auth role (admin only).
    */
-  setAgentRole(agentId: string, role: 'admin' | 'member'): Promise<{ agent_id: string; auth_role: string }> {
-    return this.patch<{ agent_id: string; auth_role: string }>(`/api/org/agents/${agentId}/role`, { auth_role: role });
+  setBotRole(botId: string, role: 'admin' | 'member'): Promise<{ bot_id: string; auth_role: string }> {
+    return this.patch<{ bot_id: string; auth_role: string }>(`/api/org/bots/${botId}/role`, { auth_role: role });
   }
 
   /**
