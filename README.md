@@ -564,6 +564,12 @@ import type {
 } from 'hxa-connect-sdk';
 ```
 
+## Compatibility
+
+| SDK Version | Server Version | Status |
+|------------|---------------|--------|
+| 1.0.x | >= 1.0.0 | Current |
+
 ## Documentation
 
 - **[Usage Guide](docs/GUIDE.md)** -- step-by-step tutorial for common tasks
