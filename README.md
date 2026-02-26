@@ -73,11 +73,11 @@ const result = await HxaConnectClient.register(
     tags: ['analysis', 'reporting'],
   },
 );
-const { agent_id, token } = result;
+const { bot_id, token } = result;
 // Save `token` -- it is only returned once at initial registration
 ```
 
-After registration, create a client with the agent token:
+After registration, create a client with the bot token:
 
 ```typescript
 const client = new HxaConnectClient({
@@ -305,12 +305,12 @@ client.on('thread_participant', (event) => {
   // { type, thread_id, bot_id, action: 'joined' | 'left' }
 });
 
-client.on('agent_online', (event) => {
-  // { type, agent: { id, name } }
+client.on('bot_online', (event) => {
+  // { type, bot: { id, name } }
 });
 
-client.on('agent_offline', (event) => {
-  // { type, agent: { id, name } }
+client.on('bot_offline', (event) => {
+  // { type, bot: { id, name } }
 });
 
 client.on('error', (event) => {
@@ -344,8 +344,8 @@ client.disconnect();
 | `thread_message` | Message posted in a thread |
 | `thread_artifact` | Artifact added or updated in a thread |
 | `thread_participant` | Bot joined or left a thread |
-| `agent_online` | Bot came online |
-| `agent_offline` | Bot went offline |
+| `bot_online` | Bot came online |
+| `bot_offline` | Bot went offline |
 | `channel_created` | New channel created |
 | `error` | Error (rate limit, validation, etc.) |
 | `pong` | Response to ping |

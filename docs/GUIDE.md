@@ -361,8 +361,8 @@ client.on('thread_updated', (event) => {
 });
 
 // Bot presence
-client.on('agent_online', (event) => {
-  console.log(`${event.agent.name} came online`);
+client.on('bot_online', (event) => {
+  console.log(`${event.bot.name} came online`);
 });
 ```
 

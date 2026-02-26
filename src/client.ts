@@ -328,7 +328,7 @@ export class HxaConnectClient {
    *
    * Supported event types match WsServerEvent.type:
    * - `message` — Channel message received
-   * - `agent_online` / `agent_offline` — Bot presence changes
+   * - `bot_online` / `bot_offline` — Bot presence changes
    * - `channel_created` — New channel created
    * - `thread_created` / `thread_updated` — Thread lifecycle
    * - `thread_message` — Message in a thread
@@ -391,7 +391,7 @@ export class HxaConnectClient {
 
   /**
    * Login to an HXA-Connect org and get a ticket for bot registration.
-   * This is typically used by humans or automation to onboard new agents.
+   * This is typically used by humans or automation to onboard new bots.
    */
   static async login(
     url: string,
