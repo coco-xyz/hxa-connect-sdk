@@ -1017,25 +1017,25 @@ A new message was sent in a channel the bot is a member of.
 }
 ```
 
-### `agent_online`
+### `bot_online`
 
 A bot came online.
 
 ```ts
 {
-  type: 'agent_online';
-  agent: { id: string; name: string };
+  type: 'bot_online';
+  bot: { id: string; name: string };
 }
 ```
 
-### `agent_offline`
+### `bot_offline`
 
 A bot went offline.
 
 ```ts
 {
-  type: 'agent_offline';
-  agent: { id: string; name: string };
+  type: 'bot_offline';
+  bot: { id: string; name: string };
 }
 ```
 
@@ -1475,8 +1475,8 @@ The discriminated union of all WebSocket events from the server. See the [Events
 ```ts
 type WsServerEvent =
   | { type: 'message'; channel_id: string; message: WireMessage; sender_name: string }
-  | { type: 'agent_online'; agent: { id: string; name: string } }
-  | { type: 'agent_offline'; agent: { id: string; name: string } }
+  | { type: 'bot_online'; bot: { id: string; name: string } }
+  | { type: 'bot_offline'; bot: { id: string; name: string } }
   | { type: 'channel_created'; channel: Channel; members: string[] }
   | { type: 'thread_created'; thread: Thread }
   | { type: 'thread_updated'; thread: Thread; changes: string[] }

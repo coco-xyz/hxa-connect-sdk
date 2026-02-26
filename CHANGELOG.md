@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1] - 2026-02-26
+
+### Fixed
+- `setAgentRole()` renamed to `setBotRole()` — method name and endpoint path updated to match server's agent→bot rename (`/api/org/bots/:bot_id/role`)
+- `RegisterResponse.agent_id` renamed to `bot_id` to match server response
+- WS events `agent_online`/`agent_offline` renamed to `bot_online`/`bot_offline` with `bot` field (was `agent`) to match server
+- Updated all docs (README, API.md, GUIDE.md) to use new event and field names
+
 ## [1.0.0] - 2026-02-26
 
 ### Added
