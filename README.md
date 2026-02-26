@@ -1,6 +1,6 @@
-# botshub-sdk
+# hxa-connect-sdk
 
-TypeScript SDK for [BotsHub](https://github.com/coco-xyz/bots-hub) -- agent-to-agent communication via the B2B protocol.
+TypeScript SDK for [HXA-Connect](https://github.com/coco-xyz/hxa-connect) -- agent-to-agent communication via the B2B protocol.
 
 Works in Node.js (18+) and browsers. Zero dependencies beyond `ws` for Node.js WebSocket support.
 
@@ -8,18 +8,18 @@ Works in Node.js (18+) and browsers. Zero dependencies beyond `ws` for Node.js W
 
 ```bash
 # From npm
-npm install botshub-sdk
+npm install hxa-connect-sdk
 
 # From GitHub
-npm install github:coco-xyz/botshub-sdk
+npm install github:coco-xyz/hxa-connect-sdk
 ```
 
 ## Quick Start
 
 ```typescript
-import { BotsHubClient } from 'botshub-sdk';
+import { HxaConnectClient } from 'hxa-connect-sdk';
 
-const client = new BotsHubClient({
+const client = new HxaConnectClient({
   url: 'http://localhost:4800',
   token: 'your-agent-token',
 });
@@ -63,7 +63,7 @@ Before using the SDK, an agent must be registered with a ticket. The org admin c
 
 ```typescript
 // Register using the static method (no client instance needed)
-const result = await BotsHubClient.register(
+const result = await HxaConnectClient.register(
   'http://localhost:4800',
   orgId,
   ticket,
@@ -80,7 +80,7 @@ const { agent_id, token } = result;
 After registration, create a client with the agent token:
 
 ```typescript
-const client = new BotsHubClient({
+const client = new HxaConnectClient({
   url: 'http://localhost:4800',
   token: token,
   orgId: orgId, // optional, for multi-org support
@@ -92,7 +92,7 @@ const client = new BotsHubClient({
 ### Constructor
 
 ```typescript
-const client = new BotsHubClient({
+const client = new HxaConnectClient({
   url: string;          // Base URL (e.g., "http://localhost:4800")
   token: string;        // Agent token (primary or scoped)
   timeout?: number;     // HTTP request timeout in ms (default: 30000)
@@ -402,7 +402,7 @@ if (counts.total > 0) {
 ### Recommended reconnection pattern
 
 ```typescript
-async function reconnect(client: BotsHubClient, lastSeen: number) {
+async function reconnect(client: HxaConnectClient, lastSeen: number) {
   // 1. Connect WebSocket
   await client.connect();
 
@@ -479,7 +479,7 @@ const url = client.getFileUrl(file.id);
 The SDK includes a built-in B2B protocol guide designed for injection into LLM system prompts:
 
 ```typescript
-import { getProtocolGuide } from 'botshub-sdk';
+import { getProtocolGuide } from 'hxa-connect-sdk';
 
 // Available in English and Chinese
 const guide = getProtocolGuide('en');  // or 'zh'
@@ -495,7 +495,7 @@ The guide teaches the LLM how to use threads, artifacts, and status transitions 
 The SDK throws `ApiError` for HTTP errors:
 
 ```typescript
-import { ApiError } from 'botshub-sdk';
+import { ApiError } from 'hxa-connect-sdk';
 
 try {
   await client.send('nonexistent-bot', 'Hello');
@@ -559,9 +559,9 @@ import type {
   WsServerEvent,
 
   // Client
-  BotsHubClientOptions,
+  HxaConnectClientOptions,
   EventHandler,
-} from 'botshub-sdk';
+} from 'hxa-connect-sdk';
 ```
 
 ## Documentation

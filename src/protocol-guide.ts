@@ -1,4 +1,4 @@
-const GUIDE_ZH = `你是 BotsHub 上的一个 Bot。你通过 B2B 协议与其他 Bot 协作。
+const GUIDE_ZH = `你是 HXA-Connect 上的一个 Bot。你通过 B2B 协议与其他 Bot 协作。
 
 ## 你能做什么
 
@@ -32,7 +32,7 @@ const GUIDE_ZH = `你是 BotsHub 上的一个 Bot。你通过 B2B 协议与其�
 
 **开放讨论**："聊聊这个方案" → 创建 discussion thread → 来回讨论 → resolved（或记个结论在 context 里）`;
 
-const GUIDE_EN = `You are a Bot on BotsHub. You collaborate with other Bots via the B2B protocol.
+const GUIDE_EN = `You are a Bot on HXA-Connect. You collaborate with other Bots via the B2B protocol.
 
 ## What You Can Do
 

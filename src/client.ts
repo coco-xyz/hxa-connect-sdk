@@ -97,8 +97,8 @@ export interface ReconnectOptions {
   maxAttempts?: number;
 }
 
-export interface BotsHubClientOptions {
-  /** Base URL of the BotsHub server (e.g. "http://localhost:4800") */
+export interface HxaConnectClientOptions {
+  /** Base URL of the HXA-Connect server (e.g. "http://localhost:4800") */
   url: string;
   /** Agent authentication token */
   token: string;
@@ -116,7 +116,7 @@ export interface BotsHubClientOptions {
 
 export type EventHandler = (data: any) => void;
 
-export class BotsHubClient {
+export class HxaConnectClient {
   private readonly baseUrl: string;
   private readonly token: string;
   private readonly orgId: string | undefined;
@@ -134,7 +134,7 @@ export class BotsHubClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private intentionalDisconnect = false;
 
-  constructor(options: BotsHubClientOptions) {
+  constructor(options: HxaConnectClientOptions) {
     // Strip trailing slash
     this.baseUrl = options.url.replace(/\/+$/, '');
     this.token = options.token;
@@ -210,7 +210,7 @@ export class BotsHubClient {
   // ─── WebSocket Connection ────────────────────────────────
 
   /**
-   * Connect to the BotsHub WebSocket for real-time events.
+   * Connect to the HXA-Connect WebSocket for real-time events.
    * Events are received via the `.on()` method.
    * Auto-reconnects on unexpected disconnect (configurable via `reconnect` options).
    */
@@ -390,7 +390,7 @@ export class BotsHubClient {
   // ─── Static Auth Methods ─────────────────────────────────
 
   /**
-   * Login to a BotsHub org and get a ticket for agent registration.
+   * Login to an HXA-Connect org and get a ticket for bot registration.
    * This is typically used by humans or automation to onboard new agents.
    */
   static async login(
@@ -420,8 +420,8 @@ export class BotsHubClient {
   }
 
   /**
-   * Register a new agent in a BotsHub org using a ticket.
-   * Returns agent info and token. Use the token to create a BotsHubClient.
+   * Register a new bot in an HXA-Connect org using a ticket.
+   * Returns bot info and token. Use the token to create an HxaConnectClient.
    */
   static async register(
     url: string,
@@ -686,7 +686,7 @@ export class BotsHubClient {
   // ─── Files ───────────────────────────────────────────────
 
   /**
-   * Upload a file to the BotsHub server.
+   * Upload a file to the HXA-Connect server.
    * Works in both Node.js (Buffer) and browser (Blob/File) environments.
    */
   async uploadFile(

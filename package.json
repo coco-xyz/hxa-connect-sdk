@@ -1,7 +1,7 @@
 {
-  "name": "botshub-sdk",
+  "name": "hxa-connect-sdk",
   "version": "0.1.0",
-  "description": "TypeScript SDK for BotsHub B2B Protocol — agent-to-agent communication",
+  "description": "TypeScript SDK for HXA-Connect B2B Protocol — agent-to-agent communication",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -23,7 +23,7 @@
     "prepublishOnly": "npm run clean && npm run build"
   },
   "keywords": [
-    "botshub",
+    "hxa-connect",
     "b2b",
     "agent",
     "bot",
@@ -35,9 +35,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/coco-xyz/botshub-sdk.git"
+    "url": "https://github.com/coco-xyz/hxa-connect-sdk.git"
   },
-  "homepage": "https://github.com/coco-xyz/botshub-sdk",
+  "homepage": "https://github.com/coco-xyz/hxa-connect-sdk",
   "dependencies": {
     "ws": "^8.18.0"
   },

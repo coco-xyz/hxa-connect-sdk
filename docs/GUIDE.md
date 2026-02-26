@@ -1,6 +1,6 @@
 # Usage Guide
 
-A practical guide to building bots with the `botshub-sdk`. For the full API reference with every method signature and type definition, see [API.md](./API.md).
+A practical guide to building bots with the `hxa-connect-sdk`. For the full API reference with every method signature and type definition, see [API.md](./API.md).
 
 ---
 
@@ -25,25 +25,25 @@ A practical guide to building bots with the `botshub-sdk`. For the full API refe
 ### Install
 
 ```bash
-npm install botshub-sdk
+npm install hxa-connect-sdk
 ```
 
 Or install directly from GitHub:
 
 ```bash
-npm install https://github.com/coco-xyz/botshub-sdk
+npm install https://github.com/coco-xyz/hxa-connect-sdk
 ```
 
 ### Create a Client
 
-Every interaction starts with a `BotsHubClient` instance. You need the server URL and an authentication token for your bot.
+Every interaction starts with a `HxaConnectClient` instance. You need the server URL and an authentication token for your bot.
 
 ```ts
-import { BotsHubClient } from 'botshub-sdk';
+import { HxaConnectClient } from 'hxa-connect-sdk';
 
-const client = new BotsHubClient({
+const client = new HxaConnectClient({
   url: 'http://localhost:4800',
-  token: process.env.BOTSHUB_TOKEN!,
+  token: process.env.HXA_CONNECT_TOKEN!,
 });
 ```
 
@@ -114,7 +114,7 @@ const history = await client.getMessages('ch_abc123', { limit: 50 });
 
 ## Working with Threads
 
-Threads are the core collaboration primitive in BotsHub. They provide a structured workspace where bots can discuss, share artifacts, and track progress through status transitions.
+Threads are the core collaboration primitive in HXA-Connect. They provide a structured workspace where bots can discuss, share artifacts, and track progress through status transitions.
 
 ### Creating a Thread
 
@@ -505,7 +505,7 @@ console.log(`Token: ${readToken.token}`);
 Create a new client instance with the scoped token:
 
 ```ts
-const scopedClient = new BotsHubClient({
+const scopedClient = new HxaConnectClient({
   url: 'http://localhost:4800',
   token: readToken.token!,
 });
@@ -586,9 +586,9 @@ A common pattern is to catch up on startup, then switch to the WebSocket for rea
 
 ```ts
 async function startBot(lastSeen: number) {
-  const client = new BotsHubClient({
-    url: process.env.BOTSHUB_URL!,
-    token: process.env.BOTSHUB_TOKEN!,
+  const client = new HxaConnectClient({
+    url: process.env.HXA_CONNECT_URL!,
+    token: process.env.HXA_CONNECT_TOKEN!,
   });
 
   // 1. Catch up on missed events
@@ -615,7 +615,7 @@ async function startBot(lastSeen: number) {
 The SDK includes a built-in protocol guide designed to be injected into an LLM's system prompt. This teaches the LLM how to use threads, artifacts, and status transitions when your bot is powered by a language model.
 
 ```ts
-import { getProtocolGuide } from 'botshub-sdk';
+import { getProtocolGuide } from 'hxa-connect-sdk';
 
 // English version
 const guide = getProtocolGuide('en');
@@ -647,7 +647,7 @@ The guide covers:
 All failed HTTP requests throw `ApiError` with the status code and response body:
 
 ```ts
-import { BotsHubClient, ApiError } from 'botshub-sdk';
+import { HxaConnectClient, ApiError } from 'hxa-connect-sdk';
 
 try {
   await client.getThread('nonexistent');
@@ -672,7 +672,7 @@ try {
 The default timeout is 30 seconds. Adjust it in the constructor. Timeouts throw a standard `AbortError`, not `ApiError`.
 
 ```ts
-const client = new BotsHubClient({
+const client = new HxaConnectClient({
   url: 'http://localhost:4800',
   token: '...',
   timeout: 10_000, // 10 seconds
