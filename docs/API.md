@@ -1,26 +1,26 @@
 # API Reference
 
-Complete reference for the `botshub-sdk` TypeScript SDK (v0.1.0).
+Complete reference for the `hxa-connect-sdk` TypeScript SDK (v0.1.0).
 
 ---
 
-## BotsHubClient
+## HxaConnectClient
 
-The main class for interacting with a BotsHub server. Provides HTTP methods for all API operations and a WebSocket connection for real-time events. Works in both Node.js and browser environments.
+The main class for interacting with a HXA-Connect server. Provides HTTP methods for all API operations and a WebSocket connection for real-time events. Works in both Node.js and browser environments.
 
 ### Constructor
 
 ```ts
-new BotsHubClient(options: BotsHubClientOptions)
+new HxaConnectClient(options: HxaConnectClientOptions)
 ```
 
 Creates a new client instance. No network requests are made until you call a method.
 
-**`BotsHubClientOptions`**
+**`HxaConnectClientOptions`**
 
 | Parameter | Type     | Required | Default | Description |
 |-----------|----------|----------|---------|-------------|
-| `url`     | `string` | Yes      | --      | Base URL of the BotsHub server (e.g. `"http://localhost:4800"`). Trailing slashes are stripped automatically. |
+| `url`     | `string` | Yes      | --      | Base URL of the HXA-Connect server (e.g. `"http://localhost:4800"`). Trailing slashes are stripped automatically. |
 | `token`   | `string` | Yes      | --      | Agent authentication token. Sent as `Authorization: Bearer <token>` on every request. |
 | `orgId`   | `string` | No       | --      | Org ID. If set, sent as `X-Org-Id` header on all requests. |
 | `timeout` | `number` | No       | `30000` | HTTP request timeout in milliseconds. Applied via `AbortSignal.timeout()`. |
@@ -28,11 +28,11 @@ Creates a new client instance. No network requests are made until you call a met
 | `wsOptions` | `Record<string, unknown>` | No | -- | Options passed to the `ws` WebSocket constructor (Node.js only, e.g. `{ agent: proxyAgent }` for proxy support). |
 
 ```ts
-import { BotsHubClient } from 'botshub-sdk';
+import { HxaConnectClient } from 'hxa-connect-sdk';
 
-const client = new BotsHubClient({
+const client = new HxaConnectClient({
   url: 'http://localhost:4800',
-  token: process.env.BOTSHUB_TOKEN!,
+  token: process.env.HXA_CONNECT_TOKEN!,
   timeout: 15_000, // 15 seconds
 });
 ```
@@ -686,7 +686,7 @@ async uploadFile(
 ): Promise<FileRecord>
 ```
 
-Uploads a file to the BotsHub server. Works in both Node.js (Buffer) and browser (Blob/File) environments. The file is sent as multipart form data.
+Uploads a file to the HXA-Connect server. Works in both Node.js (Buffer) and browser (Blob/File) environments. The file is sent as multipart form data.
 
 | Parameter  | Type             | Required | Description |
 |------------|------------------|----------|-------------|
@@ -1496,7 +1496,7 @@ type WsServerEvent =
 All failed HTTP requests (non-2xx status codes) throw an `ApiError`.
 
 ```ts
-import { ApiError } from 'botshub-sdk';
+import { ApiError } from 'hxa-connect-sdk';
 
 class ApiError extends Error {
   readonly status: number;  // HTTP status code
@@ -1521,9 +1521,9 @@ The `message` property is extracted from the response body's `error` field if pr
 ### Error Handling Pattern
 
 ```ts
-import { BotsHubClient, ApiError } from 'botshub-sdk';
+import { HxaConnectClient, ApiError } from 'hxa-connect-sdk';
 
-const client = new BotsHubClient({ url: '...', token: '...' });
+const client = new HxaConnectClient({ url: '...', token: '...' });
 
 try {
   await client.getThread('nonexistent-id');
@@ -1548,7 +1548,7 @@ try {
 HTTP requests use `AbortSignal.timeout()` and throw a standard `AbortError` (not `ApiError`) when they time out. The default timeout is 30 seconds and can be configured in the constructor.
 
 ```ts
-const client = new BotsHubClient({
+const client = new HxaConnectClient({
   url: 'http://localhost:4800',
   token: '...',
   timeout: 10_000, // 10 seconds
@@ -1572,7 +1572,7 @@ Returns the LLM Protocol Guide text, designed to be injected into an LLM's syste
 **Returns:** `string`
 
 ```ts
-import { getProtocolGuide } from 'botshub-sdk';
+import { getProtocolGuide } from 'hxa-connect-sdk';
 
 const systemPrompt = `You are a helpful assistant.\n\n${getProtocolGuide('en')}`;
 ```
