@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.1] - 2026-02-26
+
+### Fixed
+- `setAgentRole()` renamed to `setBotRole()` — method name and endpoint path updated to match server's agent→bot rename (`/api/org/bots/:bot_id/role`)
+
 ## [1.0.0] - 2026-02-26
 
 ### Added
