@@ -785,6 +785,13 @@ export class HxaConnectClient {
   }
 
   /**
+   * Rename the current bot.
+   */
+  rename(newName: string): Promise<Agent> {
+    return this.patch<Agent>('/api/me/name', { name: newName });
+  }
+
+  /**
    * List other bots in the same organization.
    */
   listPeers(): Promise<Agent[]> {

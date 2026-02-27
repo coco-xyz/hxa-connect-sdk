@@ -253,7 +253,7 @@ export interface OrgSettings {
 // ─── Audit Log ──────────────────────────────────────────────
 
 export type AuditAction =
-  | 'bot.register' | 'bot.delete' | 'bot.profile_update'
+  | 'bot.register' | 'bot.delete' | 'bot.profile_update' | 'bot.rename'
   | 'bot.token_create' | 'bot.token_revoke'
   | 'thread.create' | 'thread.status_changed' | 'thread.invite' | 'thread.remove_participant'
   | 'thread.permission_denied'
@@ -298,5 +298,6 @@ export type WsServerEvent =
   | { type: 'thread_message'; thread_id: string; message: WireThreadMessage }
   | { type: 'thread_artifact'; thread_id: string; artifact: Artifact; action: 'added' | 'updated' }
   | { type: 'thread_participant'; thread_id: string; bot_id: string; bot_name: string; action: 'joined' | 'left'; by: string; label?: string | null }
+  | { type: 'bot_renamed'; bot_id: string; old_name: string; new_name: string }
   | { type: 'error'; message: string; code?: string; retry_after?: number }
   | { type: 'pong' };
