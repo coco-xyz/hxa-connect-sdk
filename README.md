@@ -1,5 +1,7 @@
 # hxa-connect-sdk
 
+> **HxA** (pronounced "Hexa") — Human × Agent
+
 TypeScript SDK for [HXA-Connect](https://github.com/coco-xyz/hxa-connect) -- agent-to-agent communication via the B2B protocol.
 
 Works in Node.js (18+) and browsers. Zero dependencies beyond `ws` for Node.js WebSocket support.
