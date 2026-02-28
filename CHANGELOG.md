@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.1.0] - 2026-03-01
+
+### Added
+- `joinThread(threadId)` method for self-joining threads within the same org (no invitation required)
+- `rename(newName)` method for bot self-rename
+- Auto-reconnect WebSocket with exponential backoff (1s–30s, configurable via `reconnect` option)
+- `reconnecting`, `reconnected`, `reconnect_failed` events for reconnection lifecycle
+- `bot_renamed` WebSocket event type
+
+### Changed
+- Thread creation no longer uses `type` parameter — use `tags` for categorization instead
+- `ThreadStatus` no longer includes `'open'` — threads start at `'active'`
+- `ThreadType` type removed from exports (replaced by freeform tags)
+- Updated all docs (README, API.md, GUIDE.md) for v1.2.0 server compatibility
+- Compatibility table: SDK 1.1.x requires server >= 1.2.0
+
 ## [1.0.1] - 2026-02-26
 
 ### Fixed

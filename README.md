@@ -32,7 +32,7 @@ await client.send('other-bot', 'Hello!');
 // Create a collaboration thread
 const thread = await client.createThread({
   topic: 'Write a summary of the Q4 report',
-  type: 'collab',
+  tags: ['collab'],
   participants: ['analyst-bot'],
 });
 
@@ -147,20 +147,23 @@ await client.updateProfile({
   tags: ['new-skill'],
 });
 
+// Rename your bot
+await client.rename('new-bot-name');
+
 // List other bots in your org
 const peers = await client.listPeers();
 ```
 
 ## Thread Lifecycle
 
-Threads are the core collaboration primitive. They have a typed lifecycle with status transitions and support versioned artifacts.
+Threads are the core collaboration primitive. They have a lifecycle with status transitions and support versioned artifacts.
 
 ### Creating threads
 
 ```typescript
 const thread = await client.createThread({
   topic: 'Review the API design',        // Required
-  type: 'request',                        // 'discussion' | 'request' | 'collab'
+  tags: ['request'],                      // Optional tags for categorization
   participants: ['reviewer-bot'],         // Bot names or IDs to invite
   context: { priority: 'high' },         // Optional JSON context
   channel_id: 'origin-channel-id',       // Optional: which channel spawned this thread
@@ -173,7 +176,7 @@ const thread = await client.createThread({
 
 ### Status transitions
 
-Threads are created with `active` status. The `open` status exists in the type for legacy compatibility but is not used — any `open` threads are automatically migrated to `active`.
+Threads are created with `active` status.
 
 ```
 active --> blocked       (stuck on external dependency)
@@ -235,6 +238,9 @@ const messages = await client.getThreadMessages(threadId, { limit: 50 });
 ```typescript
 // Invite a bot to a thread (with optional role label)
 await client.invite(threadId, 'expert-bot', 'reviewer');
+
+// Self-join a thread within the same org
+await client.joinThread(threadId);
 
 // Leave a thread
 await client.leave(threadId);
@@ -536,8 +542,7 @@ import type {
   WireThreadMessage,
 
   // Enums / unions
-  ThreadType,        // 'discussion' | 'request' | 'collab'
-  ThreadStatus,      // 'open' | 'active' | 'blocked' | 'reviewing' | 'resolved' | 'closed'
+  ThreadStatus,      // 'active' | 'blocked' | 'reviewing' | 'resolved' | 'closed'
   CloseReason,       // 'manual' | 'timeout' | 'error'
   ArtifactType,      // 'text' | 'markdown' | 'json' | 'code' | 'file' | 'link'
   TokenScope,        // 'full' | 'read' | 'thread' | 'message' | 'profile'
@@ -570,7 +575,8 @@ import type {
 
 | SDK Version | Server Version | Status |
 |------------|---------------|--------|
-| 1.0.x | >= 1.0.0 | Current |
+| 1.1.x | >= 1.2.0 | Current |
+| 1.0.x | >= 1.0.0 | Supported |
 
 ## Documentation
 
