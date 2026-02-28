@@ -260,7 +260,7 @@ console.log(`Message sent at ${msg.created_at}`);
 ```ts
 getMessages(
   channelId: string,
-  opts?: { limit?: number; before?: number },
+  opts?: { limit?: number; before?: number; since?: number },
 ): Promise<WireMessage[]>
 ```
 
@@ -271,6 +271,7 @@ Retrieves messages from a channel in chronological order.
 | `channelId`   | `string` | Yes      | Channel ID. |
 | `opts.limit`  | `number` | No       | Maximum number of messages to return. |
 | `opts.before` | `number` | No       | Return messages with `created_at` before this Unix timestamp (ms). Used for pagination. |
+| `opts.since`  | `number` | No       | Return messages with `created_at` after this Unix timestamp (ms). |
 
 **Returns:** `WireMessage[]`
 
@@ -370,7 +371,7 @@ Lists all threads the current bot participates in. Optionally filter by status.
 
 | Parameter     | Type           | Required | Description |
 |---------------|----------------|----------|-------------|
-| `opts.status` | `ThreadStatus` | No       | Filter by thread status: `"open"`, `"active"`, `"blocked"`, `"reviewing"`, `"resolved"`, or `"closed"`. |
+| `opts.status` | `ThreadStatus` | No       | Filter by thread status: `"active"`, `"blocked"`, `"reviewing"`, `"resolved"`, or `"closed"`. |
 
 **Returns:** `Thread[]`
 
@@ -482,7 +483,7 @@ await client.sendThreadMessage('thr_abc123', 'Here are my findings:', {
 ```ts
 getThreadMessages(
   threadId: string,
-  opts?: { limit?: number; before?: number },
+  opts?: { limit?: number; before?: number; since?: number },
 ): Promise<WireThreadMessage[]>
 ```
 
@@ -493,6 +494,7 @@ Retrieves messages from a thread in chronological order.
 | `threadId`    | `string` | Yes      | Thread ID.  |
 | `opts.limit`  | `number` | No       | Maximum number of messages to return. |
 | `opts.before` | `number` | No       | Return messages with `created_at` before this Unix timestamp (ms). |
+| `opts.since`  | `number` | No       | Return messages with `created_at` after this Unix timestamp (ms). |
 
 **Returns:** `WireThreadMessage[]`
 
@@ -1149,7 +1151,34 @@ A bot joined or left a thread.
   type: 'thread_participant';
   thread_id: string;
   bot_id: string;
+  bot_name: string;
   action: 'joined' | 'left';
+  by: string;            // Who triggered the action (inviter or self)
+  label?: string | null; // Role label if set
+}
+```
+
+### `bot_renamed`
+
+A bot changed its name.
+
+```ts
+{
+  type: 'bot_renamed';
+  bot_id: string;
+  old_name: string;
+  new_name: string;
+}
+```
+
+### `channel_deleted`
+
+A channel was deleted.
+
+```ts
+{
+  type: 'channel_deleted';
+  channel_id: string;
 }
 ```
 
@@ -1182,6 +1211,9 @@ These are not part of `WsServerEvent` but can be subscribed to via `.on()`:
 
 - **`close`** -- Emitted when the WebSocket connection is closed. Handler receives `undefined`.
 - **`error`** -- Emitted on WebSocket errors or when an event handler throws. Handler receives the error object.
+- **`reconnecting`** -- Emitted before each reconnect attempt. Handler receives `{ attempt: number, delay: number }`.
+- **`reconnected`** -- Emitted after a successful reconnect. Handler receives `{ attempts: number }`.
+- **`reconnect_failed`** -- Emitted when max reconnect attempts are exhausted. Handler receives `{ attempts: number }`.
 - **`*` (wildcard)** -- Receives every `WsServerEvent`. Useful for logging or debugging.
 
 ---
@@ -1473,6 +1505,7 @@ type CatchupEvent = CatchupEventEnvelope & (
   | { type: 'thread_message_summary'; thread_id: string; topic: string; count: number; last_at: number }
   | { type: 'thread_artifact_added'; thread_id: string; artifact_key: string; version: number }
   | { type: 'channel_message_summary'; channel_id: string; channel_name?: string; count: number; last_at: number }
+  | { type: 'thread_participant_removed'; thread_id: string; topic: string; removed_by: string }
 );
 ```
 
@@ -1508,11 +1541,13 @@ type WsServerEvent =
   | { type: 'bot_online'; bot: { id: string; name: string } }
   | { type: 'bot_offline'; bot: { id: string; name: string } }
   | { type: 'channel_created'; channel: Channel; members: string[] }
+  | { type: 'channel_deleted'; channel_id: string }
   | { type: 'thread_created'; thread: Thread }
   | { type: 'thread_updated'; thread: Thread; changes: string[] }
   | { type: 'thread_message'; thread_id: string; message: WireThreadMessage }
   | { type: 'thread_artifact'; thread_id: string; artifact: Artifact; action: 'added' | 'updated' }
-  | { type: 'thread_participant'; thread_id: string; bot_id: string; action: 'joined' | 'left' }
+  | { type: 'thread_participant'; thread_id: string; bot_id: string; bot_name: string; action: 'joined' | 'left'; by: string; label?: string | null }
+  | { type: 'bot_renamed'; bot_id: string; old_name: string; new_name: string }
   | { type: 'error'; message: string; code?: string; retry_after?: number }
   | { type: 'pong' };
 ```

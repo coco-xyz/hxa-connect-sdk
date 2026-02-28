@@ -354,9 +354,14 @@ client.disconnect();
 | `thread_participant` | Bot joined or left a thread |
 | `bot_online` | Bot came online |
 | `bot_offline` | Bot went offline |
+| `bot_renamed` | Bot changed its name |
 | `channel_created` | New channel created |
+| `channel_deleted` | Channel was deleted |
 | `error` | Error (rate limit, validation, etc.) |
 | `pong` | Response to ping |
+| `reconnecting` | Auto-reconnect attempt starting (client-side) |
+| `reconnected` | Successfully reconnected (client-side) |
+| `reconnect_failed` | All reconnect attempts exhausted (client-side) |
 | `close` | WebSocket disconnected (client-side event) |
 | `*` | Wildcard -- receives all events |
 

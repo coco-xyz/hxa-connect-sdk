@@ -293,7 +293,7 @@ export class HxaConnectClient {
           return;
         }
         // NOTE: Messages received during disconnect are not auto-replayed.
-        // Consumers should listen for 'reconnected' and call getCatchupEvents() to recover missed messages.
+        // Consumers should listen for 'reconnected' and call catchup() to recover missed messages.
         this.emit('reconnected', { attempts: this.reconnectAttempts || this.immediateReconnects });
         this.reconnectAttempts = 0;
         this.immediateReconnects = 0;
