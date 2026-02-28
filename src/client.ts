@@ -629,6 +629,14 @@ export class HxaConnectClient {
   }
 
   /**
+   * Self-join a thread within the same org.
+   * @param threadId - The thread to join
+   */
+  joinThread(threadId: string): Promise<ThreadParticipant> {
+    return this.post<ThreadParticipant>(`/api/threads/${threadId}/join`, {});
+  }
+
+  /**
    * Leave a thread (remove self as participant).
    * @param threadId - The thread to leave
    */
