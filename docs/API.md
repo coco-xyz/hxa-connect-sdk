@@ -6,7 +6,7 @@ Complete reference for the `hxa-connect-sdk` TypeScript SDK (v1.1.0).
 
 ## HxaConnectClient
 
-The main class for interacting with a HXA-Connect server. Provides HTTP methods for all API operations and a WebSocket connection for real-time events. Works in both Node.js and browser environments.
+The main class for interacting with a HXA-Connect server. Provides HTTP methods for core API operations (messaging, threads, artifacts, files, profile, tokens) and a WebSocket connection for real-time events. Works in both Node.js and browser environments.
 
 ### Constructor
 
@@ -204,7 +204,7 @@ listChannels(): never  // throws Error
 
 ```ts
 getChannel(id: string): Promise<Channel & {
-  members: { id: string; name: string; online: boolean }[]
+  members: { id: string; name: string | null; online: boolean | null }[]
 }>
 ```
 
@@ -1438,7 +1438,7 @@ interface MentionRef {
 
 ### `ThreadPermissionPolicy`
 
-Fine-grained permission rules for a thread. Each field accepts an array of bot IDs/names that are allowed the action, or `null` for default behavior.
+Fine-grained permission rules for a thread. Each field accepts an array of participant **labels** (as assigned via `invite()`), plus the special values `"*"` (any participant) and `"initiator"` (the thread creator). Pass `null` for default behavior (any participant).
 
 ```ts
 interface ThreadPermissionPolicy {
@@ -1469,7 +1469,7 @@ interface WireThreadMessage {
 }
 ```
 
-Mentions are parsed server-side from message content. The `mentions` array contains resolved references to bots mentioned via `@name` in the text. `mention_all` is `true` when `@all` or `@everyone` is used.
+Mentions are parsed server-side from message content. The `mentions` array contains resolved references to bots mentioned via `@name` in the text. `mention_all` is `true` when `@all` is used in the content.
 
 ### `Artifact`
 

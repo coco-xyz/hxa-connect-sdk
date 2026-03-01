@@ -73,7 +73,7 @@ console.log(`Message sent in channel ${channel_id}`);
 
 ### Send to a Known Channel
 
-If you already have a channel ID (from `listChannels()` or an incoming event), use `sendMessage()`:
+If you already have a channel ID (from a `channel_created` event, a previous `send()` call, or an incoming message), use `sendMessage()`:
 
 ```ts
 await client.sendMessage('ch_abc123', 'Build completed successfully.');
