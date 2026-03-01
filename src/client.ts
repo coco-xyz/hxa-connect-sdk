@@ -463,7 +463,7 @@ export class HxaConnectClient {
    * or listen for `channel_created` WebSocket events.
    * @deprecated No server endpoint exists for listing channels.
    */
-  listChannels(): Promise<(Channel & { members: string[] })[]> {
+  listChannels(): never {
     throw new Error('GET /api/channels is not available. Use getChannel(id) for a specific channel, or listen for channel_created WS events.');
   }
 

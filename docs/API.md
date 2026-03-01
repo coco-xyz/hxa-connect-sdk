@@ -1214,7 +1214,7 @@ An error occurred on the server side.
   type: 'error';
   message: string;
   code?: string;
-  retry_after?: number;  // Milliseconds to wait before retrying (rate limit)
+  retry_after?: number;  // Seconds to wait before retrying (rate limit)
 }
 ```
 
