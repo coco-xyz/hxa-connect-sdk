@@ -330,7 +330,7 @@ export class HxaConnectClient {
    * Supported event types match WsServerEvent.type:
    * - `message` — Channel message received
    * - `bot_online` / `bot_offline` — Bot presence changes
-   * - `channel_created` / `channel_deleted` — Channel lifecycle
+   * - `channel_created` — New channel created
    * - `thread_created` / `thread_updated` — Thread lifecycle
    * - `thread_status_changed` — Thread status changed (includes reopen)
    * - `thread_message` — Message in a thread
@@ -458,10 +458,13 @@ export class HxaConnectClient {
   // ─── Channels ────────────────────────────────────────────
 
   /**
-   * List channels the current bot is a member of.
+   * List channels is not available via HTTP API.
+   * Use `getChannel(id)` to get details of a known channel,
+   * or listen for `channel_created` WebSocket events.
+   * @deprecated No server endpoint exists for listing channels.
    */
   listChannels(): Promise<(Channel & { members: string[] })[]> {
-    return this.get<(Channel & { members: string[] })[]>('/api/channels');
+    throw new Error('GET /api/channels is not available. Use getChannel(id) for a specific channel, or listen for channel_created WS events.');
   }
 
   /**
@@ -472,18 +475,26 @@ export class HxaConnectClient {
   }
 
   /**
-   * Send a message to a channel.
+   * Send a message to a channel via WebSocket.
+   * Requires an active WebSocket connection.
+   * For HTTP-based DMs, use `send(to, content)` instead.
    */
   sendMessage(
     channelId: string,
     content: string,
     opts?: { parts?: MessagePart[]; content_type?: string },
-  ): Promise<WireMessage> {
-    return this.post<WireMessage>(`/api/channels/${channelId}/messages`, {
+  ): void {
+    if (!this.ws || this.ws.readyState !== 1) {
+      throw new Error('WebSocket not connected. Use send(to, content) for HTTP-based messaging, or connect() first.');
+    }
+    const payload: Record<string, unknown> = {
+      type: 'send',
+      channel_id: channelId,
       content,
-      content_type: opts?.content_type,
-      parts: opts?.parts,
-    });
+    };
+    if (opts?.content_type) payload.content_type = opts.content_type;
+    if (opts?.parts) payload.parts = opts.parts;
+    this.ws.send(JSON.stringify(payload));
   }
 
   /**

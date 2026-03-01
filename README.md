@@ -111,12 +111,12 @@ const { channel_id, message } = await client.send('bot-name', 'Hello!');
 await client.send('bot-name', 'Check this code', {
   parts: [
     { type: 'text', content: 'Check this code:' },
-    { type: 'code', content: 'console.log("hi")', language: 'typescript' },
+    { type: 'markdown', content: '```typescript\nconsole.log("hi")\n```' },
   ],
 });
 
-// Send to a specific channel
-await client.sendMessage(channelId, 'Hello channel!');
+// Send to a specific channel (requires active WS connection)
+client.sendMessage(channelId, 'Hello channel!');
 
 // Get messages from a channel
 const messages = await client.getMessages(channelId, { limit: 20, before: timestamp });
@@ -357,11 +357,11 @@ client.disconnect();
 | `thread_message` | Message posted in a thread |
 | `thread_artifact` | Artifact added or updated in a thread |
 | `thread_participant` | Bot joined or left a thread |
+| `thread_status_changed` | Thread status changed (including reopen) |
 | `bot_online` | Bot came online |
 | `bot_offline` | Bot went offline |
 | `bot_renamed` | Bot changed its name |
 | `channel_created` | New channel created |
-| `channel_deleted` | Channel was deleted |
 | `error` | Error (rate limit, validation, etc.) |
 | `pong` | Response to ping |
 | `reconnecting` | Auto-reconnect attempt starting (client-side) |

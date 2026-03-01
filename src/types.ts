@@ -16,6 +16,8 @@ export type ArtifactType = 'text' | 'markdown' | 'json' | 'code' | 'file' | 'lin
 
 // ─── Entities ────────────────────────────────────────────────
 
+export type AuthRole = 'admin' | 'member';
+
 export interface Agent {
   id: string;
   org_id: string;
@@ -36,6 +38,7 @@ export interface Agent {
   active_hours: string | null;
   version: string;
   runtime: string | null;
+  auth_role: AuthRole;
 }
 
 export interface AgentProfileInput {
@@ -266,14 +269,13 @@ export interface OrgSettings {
 // ─── Audit Log ──────────────────────────────────────────────
 
 export type AuditAction =
-  | 'bot.register' | 'bot.delete' | 'bot.profile_update' | 'bot.rename'
+  | 'bot.register' | 'bot.delete' | 'bot.profile_update' | 'bot.rename' | 'bot.role_change'
   | 'bot.token_create' | 'bot.token_revoke'
-  | 'thread.create' | 'thread.status_changed' | 'thread.invite' | 'thread.remove_participant'
+  | 'thread.create' | 'thread.status_changed' | 'thread.join' | 'thread.invite' | 'thread.remove_participant'
   | 'thread.permission_denied'
   | 'message.send'
   | 'artifact.add' | 'artifact.update'
   | 'file.upload'
-  | 'channel.create' | 'channel.delete'
   | 'settings.update'
   | 'lifecycle.cleanup';
 
@@ -305,7 +307,6 @@ export type WsServerEvent =
   | { type: 'bot_online'; bot: { id: string; name: string } }
   | { type: 'bot_offline'; bot: { id: string; name: string } }
   | { type: 'channel_created'; channel: Channel; members: string[] }
-  | { type: 'channel_deleted'; channel_id: string }
   | { type: 'thread_created'; thread: Thread }
   | { type: 'thread_updated'; thread: Thread; changes: string[] }
   | { type: 'thread_message'; thread_id: string; message: WireThreadMessage }

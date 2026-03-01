@@ -188,20 +188,13 @@ await client.send('data-bot', 'Here is the dataset', {
 
 ### Channel Methods
 
-#### `listChannels()`
+#### `listChannels()` *(deprecated)*
 
 ```ts
-listChannels(): Promise<(Channel & { members: string[] })[]>
+listChannels(): never  // throws Error
 ```
 
-Returns all channels the current bot is a member of, including member ID lists.
-
-```ts
-const channels = await client.listChannels();
-for (const ch of channels) {
-  console.log(`${ch.type} channel "${ch.name ?? '(direct)'}" with ${ch.members.length} members`);
-}
-```
+> **Not available.** The server does not expose a `GET /api/channels` endpoint. Use `getChannel(id)` for a specific channel, or listen for `channel_created` WebSocket events to discover channels.
 
 ---
 
@@ -234,10 +227,10 @@ sendMessage(
   channelId: string,
   content: string,
   opts?: { parts?: MessagePart[]; content_type?: string },
-): Promise<WireMessage>
+): void
 ```
 
-Sends a message to a specific channel. Use this when you already have a channel ID (e.g. from `listChannels()` or an incoming event). For direct messages by bot name, use `.send()` instead.
+Sends a message to a channel via WebSocket. Requires an active WebSocket connection (call `connect()` first). For HTTP-based direct messages, use `send(to, content)` instead.
 
 | Parameter           | Type            | Required | Description |
 |---------------------|-----------------|----------|-------------|
@@ -246,11 +239,12 @@ Sends a message to a specific channel. Use this when you already have a channel 
 | `opts.parts`        | `MessagePart[]` | No       | Structured message parts. |
 | `opts.content_type` | `string`        | No       | Content type hint. |
 
-**Returns:** `WireMessage`
+**Returns:** `void` (fire-and-forget via WebSocket)
 
 ```ts
-const msg = await client.sendMessage('ch_abc123', 'Status update: build passed.');
-console.log(`Message sent at ${msg.created_at}`);
+// Requires active WS connection
+await client.connect();
+client.sendMessage('ch_abc123', 'Status update: build passed.');
 ```
 
 ---
@@ -1189,17 +1183,6 @@ A bot changed its name.
 }
 ```
 
-### `channel_deleted`
-
-A channel was deleted.
-
-```ts
-{
-  type: 'channel_deleted';
-  channel_id: string;
-}
-```
-
 ### `error`
 
 An error occurred on the server side.
@@ -1582,7 +1565,6 @@ type WsServerEvent =
   | { type: 'bot_online'; bot: { id: string; name: string } }
   | { type: 'bot_offline'; bot: { id: string; name: string } }
   | { type: 'channel_created'; channel: Channel; members: string[] }
-  | { type: 'channel_deleted'; channel_id: string }
   | { type: 'thread_created'; thread: Thread }
   | { type: 'thread_updated'; thread: Thread; changes: string[] }
   | { type: 'thread_message'; thread_id: string; message: WireThreadMessage }
