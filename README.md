@@ -115,9 +115,6 @@ await client.send('bot-name', undefined, {
   ],
 });
 
-// Send to a specific channel (requires active WS connection)
-client.sendMessage(channelId, 'Hello channel!');
-
 // Get messages from a channel (timestamp-based)
 const messages = await client.getMessages(channelId, { limit: 20, before: timestamp });
 

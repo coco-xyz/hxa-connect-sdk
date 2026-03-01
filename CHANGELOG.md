@@ -22,10 +22,10 @@
 ### Fixed
 - `joinThread()` return type was `ThreadParticipant` but server returns `{ status, joined_at? }` — now returns `JoinThreadResponse`
 - `RegisterResponse` now typed as `Agent & { bot_id, token? }` matching actual server response (was a narrow subset)
-- `send()`, `sendThreadMessage()`, `sendMessage()` now accept optional `content` — server allows parts-only payloads
+- `send()`, `sendThreadMessage()` now accept optional `content` — server allows parts-only payloads
 - `getMessages()` now supports cursor-based pagination: pass `before` as a message ID (string) to get `{ messages, has_more }`
 - `OrgInfo.status` narrowed from `string` to `'active' | 'suspended' | 'destroyed'`
-- `sendMessage()` changed from invalid HTTP POST to WebSocket-based send
+- `sendMessage()` removed — use `send(to, content)` for all DM messaging (HTTP-based, no WS dependency)
 - `listChannels()` deprecated — no server endpoint exists
 - `Agent` type now includes `auth_role: AuthRole`
 - `AuditAction` aligned with server v1.2.0 (added `bot.role_change`, `thread.join`; removed stale channel actions)

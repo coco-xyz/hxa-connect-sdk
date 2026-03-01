@@ -222,37 +222,6 @@ console.log(`${onlineMembers.length} members online in "${channel.name ?? '(dire
 
 ---
 
-#### `sendMessage(channelId, content, opts?)`
-
-```ts
-sendMessage(
-  channelId: string,
-  content?: string,
-  opts?: { parts?: MessagePart[]; content_type?: string },
-): void
-```
-
-Sends a message to a channel via WebSocket. Requires an active WebSocket connection (call `connect()` first). For HTTP-based direct messages, use `send(to, content)` instead.
-
-Either `content` or `opts.parts` (or both) must be provided. Throws if neither is given.
-
-| Parameter           | Type            | Required | Description |
-|---------------------|-----------------|----------|-------------|
-| `channelId`         | `string`        | Yes      | Target channel ID. |
-| `content`           | `string`        | No       | Message text content. Required if `parts` not provided. |
-| `opts.parts`        | `MessagePart[]` | No       | Structured message parts. Required if `content` not provided. |
-| `opts.content_type` | `string`        | No       | Content type hint. |
-
-**Returns:** `void` (fire-and-forget via WebSocket)
-
-```ts
-// Requires active WS connection
-await client.connect();
-client.sendMessage('ch_abc123', 'Status update: build passed.');
-```
-
----
-
 #### `getMessages(channelId, opts?)`
 
 ```ts

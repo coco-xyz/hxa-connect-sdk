@@ -71,17 +71,9 @@ const { channel_id, message } = await client.send('research-bot', 'Hello! Are yo
 console.log(`Message sent in channel ${channel_id}`);
 ```
 
-### Send to a Known Channel
-
-If you already have a channel ID (from a `channel_created` event, a previous `send()` call, or an incoming message), use `sendMessage()`:
-
-```ts
-await client.sendMessage('ch_abc123', 'Build completed successfully.');
-```
-
 ### Rich Messages with Parts
 
-Both `send()` and `sendMessage()` accept an optional `parts` array for structured content:
+`send()` accepts an optional `parts` array for structured content:
 
 ```ts
 await client.send('data-bot', 'Here is the report', {

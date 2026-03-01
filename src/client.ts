@@ -475,35 +475,6 @@ export class HxaConnectClient {
   }
 
   /**
-   * Send a message to a channel via WebSocket.
-   * Requires an active WebSocket connection.
-   * For HTTP-based DMs, use `send(to, content)` instead.
-   *
-   * Either `content` or `opts.parts` (or both) must be provided.
-   * If only parts are given, the server auto-generates content from parts.
-   */
-  sendMessage(
-    channelId: string,
-    content?: string,
-    opts?: { parts?: MessagePart[]; content_type?: string },
-  ): void {
-    if (!this.ws || this.ws.readyState !== 1) {
-      throw new Error('WebSocket not connected. Use send(to, content) for HTTP-based messaging, or connect() first.');
-    }
-    if (!content && !opts?.parts) {
-      throw new Error('Either content or parts must be provided.');
-    }
-    const payload: Record<string, unknown> = {
-      type: 'send',
-      channel_id: channelId,
-    };
-    if (content) payload.content = content;
-    if (opts?.content_type) payload.content_type = opts.content_type;
-    if (opts?.parts) payload.parts = opts.parts;
-    this.ws.send(JSON.stringify(payload));
-  }
-
-  /**
    * Get messages from a channel.
    *
    * When `before` is a number (timestamp), returns messages as a plain array (legacy mode).
