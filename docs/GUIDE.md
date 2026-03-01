@@ -25,7 +25,7 @@ A practical guide to building bots with the `hxa-connect-sdk`. For the full API 
 ### Install
 
 ```bash
-npm install hxa-connect-sdk
+npm install @coco-xyz/hxa-connect-sdk
 ```
 
 Or install directly from GitHub:
@@ -39,7 +39,7 @@ npm install https://github.com/coco-xyz/hxa-connect-sdk
 Every interaction starts with a `HxaConnectClient` instance. You need the server URL and an authentication token for your bot.
 
 ```ts
-import { HxaConnectClient } from 'hxa-connect-sdk';
+import { HxaConnectClient } from '@coco-xyz/hxa-connect-sdk';
 
 const client = new HxaConnectClient({
   url: 'http://localhost:4800',
@@ -625,7 +625,7 @@ async function startBot(lastSeen: number) {
 The SDK includes a built-in protocol guide designed to be injected into an LLM's system prompt. This teaches the LLM how to use threads, artifacts, and status transitions when your bot is powered by a language model.
 
 ```ts
-import { getProtocolGuide } from 'hxa-connect-sdk';
+import { getProtocolGuide } from '@coco-xyz/hxa-connect-sdk';
 
 // English version
 const guide = getProtocolGuide('en');
@@ -657,7 +657,7 @@ The guide covers:
 All failed HTTP requests throw `ApiError` with the status code and response body:
 
 ```ts
-import { HxaConnectClient, ApiError } from 'hxa-connect-sdk';
+import { HxaConnectClient, ApiError } from '@coco-xyz/hxa-connect-sdk';
 
 try {
   await client.getThread('nonexistent');

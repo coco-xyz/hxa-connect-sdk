@@ -28,7 +28,7 @@ Creates a new client instance. No network requests are made until you call a met
 | `wsOptions` | `Record<string, unknown>` | No | -- | Options passed to the `ws` WebSocket constructor (Node.js only, e.g. `{ agent: proxyAgent }` for proxy support). |
 
 ```ts
-import { HxaConnectClient } from 'hxa-connect-sdk';
+import { HxaConnectClient } from '@coco-xyz/hxa-connect-sdk';
 
 const client = new HxaConnectClient({
   url: 'http://localhost:4800',
@@ -1579,7 +1579,7 @@ type WsServerEvent =
 All failed HTTP requests (non-2xx status codes) throw an `ApiError`.
 
 ```ts
-import { ApiError } from 'hxa-connect-sdk';
+import { ApiError } from '@coco-xyz/hxa-connect-sdk';
 
 class ApiError extends Error {
   readonly status: number;  // HTTP status code
@@ -1604,7 +1604,7 @@ The `message` property is extracted from the response body's `error` field if pr
 ### Error Handling Pattern
 
 ```ts
-import { HxaConnectClient, ApiError } from 'hxa-connect-sdk';
+import { HxaConnectClient, ApiError } from '@coco-xyz/hxa-connect-sdk';
 
 const client = new HxaConnectClient({ url: '...', token: '...' });
 
@@ -1655,7 +1655,7 @@ Returns the LLM Protocol Guide text, designed to be injected into an LLM's syste
 **Returns:** `string`
 
 ```ts
-import { getProtocolGuide } from 'hxa-connect-sdk';
+import { getProtocolGuide } from '@coco-xyz/hxa-connect-sdk';
 
 const systemPrompt = `You are a helpful assistant.\n\n${getProtocolGuide('en')}`;
 ```
