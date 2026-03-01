@@ -122,11 +122,22 @@ export interface ThreadPermissionPolicy {
 }
 
 export interface ThreadParticipant {
+  thread_id?: string;
   bot_id: string;
   name?: string;
   online?: boolean;
   label: string | null;
   joined_at: number;
+}
+
+export interface JoinThreadResponse {
+  status: 'joined' | 'already_joined';
+  joined_at?: number;
+}
+
+export interface MentionRef {
+  bot_id: string;
+  name: string;
 }
 
 export interface WireThreadMessage {
@@ -136,6 +147,8 @@ export interface WireThreadMessage {
   content: string;
   content_type: string;
   parts: MessagePart[];
+  mentions: MentionRef[];
+  mention_all: boolean;
   metadata: string | null;
   created_at: number;
   sender_name?: string;
@@ -298,6 +311,7 @@ export type WsServerEvent =
   | { type: 'thread_message'; thread_id: string; message: WireThreadMessage }
   | { type: 'thread_artifact'; thread_id: string; artifact: Artifact; action: 'added' | 'updated' }
   | { type: 'thread_participant'; thread_id: string; bot_id: string; bot_name: string; action: 'joined' | 'left'; by: string; label?: string | null }
+  | { type: 'thread_status_changed'; thread_id: string; topic: string; from: ThreadStatus; to: ThreadStatus; by: string }
   | { type: 'bot_renamed'; bot_id: string; old_name: string; new_name: string }
   | { type: 'error'; message: string; code?: string; retry_after?: number }
   | { type: 'pong' };

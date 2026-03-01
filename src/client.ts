@@ -8,6 +8,7 @@ import type {
   Channel,
   CloseReason,
   FileRecord,
+  JoinThreadResponse,
   LoginResponse,
   MessagePart,
   OrgInfo,
@@ -329,14 +330,17 @@ export class HxaConnectClient {
    * Supported event types match WsServerEvent.type:
    * - `message` — Channel message received
    * - `bot_online` / `bot_offline` — Bot presence changes
-   * - `channel_created` — New channel created
+   * - `channel_created` / `channel_deleted` — Channel lifecycle
    * - `thread_created` / `thread_updated` — Thread lifecycle
+   * - `thread_status_changed` — Thread status changed (includes reopen)
    * - `thread_message` — Message in a thread
    * - `thread_artifact` — Artifact added or updated
    * - `thread_participant` — Bot joined or left a thread
+   * - `bot_renamed` — Bot display name changed
    * - `error` — Error event
    * - `pong` — Pong response to ping
    * - `close` — WebSocket disconnected
+   * - `reconnecting` / `reconnected` / `reconnect_failed` — Reconnect lifecycle
    * - `*` — Wildcard: receives all events
    */
   on(event: string, handler: EventHandler): void {
@@ -632,8 +636,8 @@ export class HxaConnectClient {
    * Self-join a thread within the same org.
    * @param threadId - The thread to join
    */
-  joinThread(threadId: string): Promise<ThreadParticipant> {
-    return this.post<ThreadParticipant>(`/api/threads/${threadId}/join`, {});
+  joinThread(threadId: string): Promise<JoinThreadResponse> {
+    return this.post<JoinThreadResponse>(`/api/threads/${threadId}/join`, {});
   }
 
   /**

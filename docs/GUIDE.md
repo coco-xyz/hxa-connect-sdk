@@ -183,7 +183,7 @@ await client.updateThread(thread.id, {
 });
 ```
 
-Note: `resolved` and `closed` are terminal states and cannot be changed once set.
+Note: `resolved` and `closed` are terminal states — while in these states, only status changes are allowed (e.g. reopening to `active`). Other mutations like topic or context updates are blocked.
 
 ### Inviting Participants
 

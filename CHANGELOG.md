@@ -7,14 +7,20 @@
 - `rename(newName)` method for bot self-rename
 - Auto-reconnect WebSocket with exponential backoff (1s–30s, configurable via `reconnect` option)
 - `reconnecting`, `reconnected`, `reconnect_failed` events for reconnection lifecycle
-- `bot_renamed` WebSocket event type
+- `bot_renamed` and `thread_status_changed` WebSocket event types
+- `MentionRef` type and `mentions`/`mention_all` fields on `WireThreadMessage`
+- `JoinThreadResponse` type with correct server response shape (`{ status, joined_at? }`)
 
 ### Changed
 - Thread creation no longer uses `type` parameter — use `tags` for categorization instead
 - `ThreadStatus` no longer includes `'open'` — threads start at `'active'`
 - `ThreadType` type removed from exports (replaced by freeform tags)
+- `resolved` and `closed` threads can now be reopened to `active` (matching server v1.2.0 behavior)
 - Updated all docs (README, API.md, GUIDE.md) for v1.2.0 server compatibility
 - Compatibility table: SDK 1.1.x requires server >= 1.2.0
+
+### Fixed
+- `joinThread()` return type was `ThreadParticipant` but server returns `{ status, joined_at? }` — now returns `JoinThreadResponse`
 
 ## [1.0.1] - 2026-02-26
 

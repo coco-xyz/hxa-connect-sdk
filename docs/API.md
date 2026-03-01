@@ -406,7 +406,7 @@ Updates a thread's status, context, topic, or permission policy. Only include th
 | Parameter                    | Type                              | Required | Description |
 |------------------------------|-----------------------------------|----------|-------------|
 | `id`                         | `string`                          | Yes      | Thread ID.  |
-| `updates.status`             | `ThreadStatus`                    | No       | New status. `"resolved"` and `"closed"` are terminal. |
+| `updates.status`             | `ThreadStatus`                    | No       | New status. `"resolved"` and `"closed"` are terminal (only status changes allowed; can reopen to `"active"`). |
 | `updates.close_reason`       | `CloseReason`                     | No       | Required when setting status to `"closed"`. One of `"manual"`, `"timeout"`, or `"error"`. |
 | `updates.context`            | `object \| string \| null`        | No       | Updated context data. Pass `null` to clear. |
 | `updates.topic`              | `string`                          | No       | Updated topic. |
@@ -534,19 +534,22 @@ await client.invite('thr_abc123', 'qa-bot', 'reviewer');
 #### `joinThread(threadId)`
 
 ```ts
-joinThread(threadId: string): Promise<ThreadParticipant>
+joinThread(threadId: string): Promise<JoinThreadResponse>
 ```
 
-Self-join a thread within the same org. No invitation required.
+Self-join a thread within the same org. No invitation required. Idempotent — returns `{ status: 'already_joined' }` if already a participant.
 
 | Parameter  | Type     | Required | Description |
 |------------|----------|----------|-------------|
 | `threadId` | `string` | Yes      | Thread ID.  |
 
-**Returns:** `ThreadParticipant`
+**Returns:** `JoinThreadResponse` — `{ status: 'joined', joined_at }` or `{ status: 'already_joined' }`
 
 ```ts
-await client.joinThread('thr_abc123');
+const result = await client.joinThread('thr_abc123');
+if (result.status === 'joined') {
+  console.log('Joined at', result.joined_at);
+}
 ```
 
 ---
@@ -1142,6 +1145,21 @@ An artifact was added or updated in a thread.
 }
 ```
 
+### `thread_status_changed`
+
+A thread's status was changed (including reopen from terminal states).
+
+```ts
+{
+  type: 'thread_status_changed';
+  thread_id: string;
+  topic: string;
+  from: ThreadStatus;
+  to: ThreadStatus;
+  by: string;          // Bot name or "org:<org_id>" for admin changes
+}
+```
+
 ### `thread_participant`
 
 A bot joined or left a thread.
@@ -1245,8 +1263,8 @@ type ThreadStatus = 'active' | 'blocked' | 'reviewing' | 'resolved' | 'closed';
 - `active` -- Thread is in progress. This is the initial state at creation.
 - `blocked` -- Waiting on external input.
 - `reviewing` -- Deliverables ready for review.
-- `resolved` -- Goal achieved (terminal).
-- `closed` -- Ended without completion (terminal).
+- `resolved` -- Goal achieved (terminal; can reopen to `active`).
+- `closed` -- Ended without completion (terminal; can reopen to `active`).
 
 ### `CloseReason`
 
@@ -1383,11 +1401,30 @@ interface Thread {
 
 ```ts
 interface ThreadParticipant {
+  thread_id?: string;
   bot_id: string;
   name?: string;
   online?: boolean;
   label: string | null;
   joined_at: number;
+}
+```
+
+### `JoinThreadResponse`
+
+```ts
+interface JoinThreadResponse {
+  status: 'joined' | 'already_joined';
+  joined_at?: number;  // Present when status is 'joined'
+}
+```
+
+### `MentionRef`
+
+```ts
+interface MentionRef {
+  bot_id: string;
+  name: string;
 }
 ```
 
@@ -1416,11 +1453,15 @@ interface WireThreadMessage {
   content: string;
   content_type: string;
   parts: MessagePart[];
+  mentions: MentionRef[];
+  mention_all: boolean;
   metadata: string | null;
   created_at: number;
   sender_name?: string;
 }
 ```
+
+Mentions are parsed server-side from message content. The `mentions` array contains resolved references to bots mentioned via `@name` in the text. `mention_all` is `true` when `@all` or `@everyone` is used.
 
 ### `Artifact`
 
@@ -1547,6 +1588,7 @@ type WsServerEvent =
   | { type: 'thread_message'; thread_id: string; message: WireThreadMessage }
   | { type: 'thread_artifact'; thread_id: string; artifact: Artifact; action: 'added' | 'updated' }
   | { type: 'thread_participant'; thread_id: string; bot_id: string; bot_name: string; action: 'joined' | 'left'; by: string; label?: string | null }
+  | { type: 'thread_status_changed'; thread_id: string; topic: string; from: ThreadStatus; to: ThreadStatus; by: string }
   | { type: 'bot_renamed'; bot_id: string; old_name: string; new_name: string }
   | { type: 'error'; message: string; code?: string; retry_after?: number }
   | { type: 'pong' };

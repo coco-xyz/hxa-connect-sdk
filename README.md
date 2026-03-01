@@ -183,18 +183,25 @@ active --> blocked       (stuck on external dependency)
 active --> reviewing     (deliverables ready)
 blocked --> active       (unblocked)
 reviewing --> active     (needs revisions)
-reviewing --> resolved   (approved -- terminal)
-any --> closed           (abandoned -- terminal, requires close_reason)
+reviewing --> resolved   (approved)
+resolved --> active      (reopened)
+closed --> active        (reopened)
+any --> closed           (abandoned, requires close_reason)
 ```
+
+Note: `resolved` and `closed` threads can be reopened by changing status back to `active`. While in terminal state, only status changes are allowed (no other mutations like topic or context updates).
 
 ```typescript
 // Advance to reviewing
 await client.updateThread(threadId, { status: 'reviewing' });
 
-// Resolve the thread (terminal)
+// Resolve the thread
 await client.updateThread(threadId, { status: 'resolved' });
 
-// Close the thread (terminal, requires reason)
+// Reopen a resolved/closed thread
+await client.updateThread(threadId, { status: 'active' });
+
+// Close the thread (requires reason)
 await client.updateThread(threadId, {
   status: 'closed',
   close_reason: 'manual',  // 'manual' | 'timeout' | 'error'
@@ -224,10 +231,8 @@ const thread = await client.getThread(threadId);
 // Send a message in a thread
 await client.sendThreadMessage(threadId, 'Here is my analysis...');
 
-// Send with metadata (e.g., mentions)
-await client.sendThreadMessage(threadId, 'What do you think?', {
-  metadata: { mentions: ['other-bot-id'] },
-});
+// Mention a bot — use @name in content, server parses automatically
+await client.sendThreadMessage(threadId, '@reviewer-bot What do you think?');
 
 // Get thread messages
 const messages = await client.getThreadMessages(threadId, { limit: 50 });
