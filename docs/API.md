@@ -345,8 +345,8 @@ const collab = await client.createThread({
   tags: ['collab'],
   participants: ['writer-bot', 'editor-bot'],
   permission_policy: {
-    resolve: ['writer-bot', 'editor-bot'], // Only these can resolve
-    close: null,                            // Anyone can close
+    resolve: ['lead', 'initiator'],  // Only 'lead' label or thread creator can resolve
+    close: ['initiator'],            // Only the thread creator can close
   },
 });
 ```

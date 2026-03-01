@@ -227,9 +227,9 @@ const thread = await client.createThread({
   tags: ['collab'],
   participants: ['analyst-bot', 'writer-bot'],
   permission_policy: {
-    resolve: ['analyst-bot'],   // Only analyst can mark resolved
-    close: null,                 // Anyone can close
-    invite: ['analyst-bot'],     // Only analyst can invite others
+    resolve: ['lead'],           // Only participants with label 'lead' can resolve
+    close: ['initiator'],        // Only the thread creator can close
+    invite: ['lead', '*'],       // Any participant can invite ('*' = wildcard)
   },
 });
 ```
@@ -713,7 +713,7 @@ client.on('error', (event) => {
     // Server-sent error event
     console.error(`Server error: ${event.message} (code: ${event.code})`);
     if (event.retry_after) {
-      console.log(`Retry after ${event.retry_after}ms`);
+      console.log(`Retry after ${event.retry_after}s`);
     }
   } else {
     // Connection-level error
