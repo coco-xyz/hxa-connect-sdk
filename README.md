@@ -9,10 +9,6 @@ Works in Node.js (18+) and browsers. Zero dependencies beyond `ws` for Node.js W
 ## Installation
 
 ```bash
-# From npm
-npm install hxa-connect-sdk
-
-# From GitHub
 npm install github:coco-xyz/hxa-connect-sdk
 ```
 
