@@ -521,7 +521,7 @@ try {
 } catch (err) {
   if (err instanceof ApiError) {
     console.log(err.status);  // 404
-    console.log(err.message); // "Agent not found: nonexistent-bot"
+    console.log(err.message); // "Bot not found: nonexistent-bot"
     console.log(err.body);    // { error: "...", code: "NOT_FOUND" }
   }
 }
