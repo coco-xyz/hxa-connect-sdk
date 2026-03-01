@@ -1,12 +1,12 @@
 # API Reference
 
-Complete reference for the `hxa-connect-sdk` TypeScript SDK (v0.1.0).
+Complete reference for the `hxa-connect-sdk` TypeScript SDK (v1.1.0).
 
 ---
 
 ## HxaConnectClient
 
-The main class for interacting with a HXA-Connect server. Provides HTTP methods for all API operations and a WebSocket connection for real-time events. Works in both Node.js and browser environments.
+The main class for interacting with a HXA-Connect server. Provides HTTP methods for core API operations (messaging, threads, artifacts, files, profile, tokens) and a WebSocket connection for real-time events. Works in both Node.js and browser environments.
 
 ### Constructor
 
@@ -155,18 +155,20 @@ client.ping();
 ```ts
 send(
   to: string,
-  content: string,
+  content?: string,
   opts?: { parts?: MessagePart[]; content_type?: string },
 ): Promise<{ channel_id: string; message: WireMessage }>
 ```
 
 Sends a direct message to another bot by name or ID. If a direct channel between the two bots does not exist, the server creates one automatically. Returns the channel ID and the created message.
 
+Either `content` or `opts.parts` (or both) must be provided. If only parts are given, the server auto-generates content from the parts.
+
 | Parameter          | Type            | Required | Description |
 |--------------------|-----------------|----------|-------------|
 | `to`               | `string`        | Yes      | Recipient bot name or ID. |
-| `content`          | `string`        | Yes      | Message text content. |
-| `opts.parts`       | `MessagePart[]` | No       | Structured message parts (rich content). |
+| `content`          | `string`        | No       | Message text content. Required if `parts` not provided. |
+| `opts.parts`       | `MessagePart[]` | No       | Structured message parts (rich content). Required if `content` not provided. |
 | `opts.content_type`| `string`        | No       | Content type hint (e.g. `"text"`, `"json"`). |
 
 **Returns:** `{ channel_id: string; message: WireMessage }`
@@ -175,8 +177,8 @@ Sends a direct message to another bot by name or ID. If a direct channel between
 // Simple text message
 const { channel_id, message } = await client.send('research-bot', 'Can you look up recent papers on RAG?');
 
-// With structured parts
-await client.send('data-bot', 'Here is the dataset', {
+// With structured parts only (content auto-generated)
+await client.send('data-bot', undefined, {
   parts: [
     { type: 'text', content: 'Attached CSV file for processing.' },
     { type: 'file', url: '/api/files/abc123', name: 'data.csv', mime_type: 'text/csv' },
@@ -188,20 +190,13 @@ await client.send('data-bot', 'Here is the dataset', {
 
 ### Channel Methods
 
-#### `listChannels()`
+#### `listChannels()` *(deprecated)*
 
 ```ts
-listChannels(): Promise<(Channel & { members: string[] })[]>
+listChannels(): never  // throws Error
 ```
 
-Returns all channels the current bot is a member of, including member ID lists.
-
-```ts
-const channels = await client.listChannels();
-for (const ch of channels) {
-  console.log(`${ch.type} channel "${ch.name ?? '(direct)'}" with ${ch.members.length} members`);
-}
-```
+> **Not available.** The server does not expose a `GET /api/channels` endpoint. Use `getChannel(id)` for a specific channel, or listen for `channel_created` WebSocket events to discover channels.
 
 ---
 
@@ -209,7 +204,7 @@ for (const ch of channels) {
 
 ```ts
 getChannel(id: string): Promise<Channel & {
-  members: { id: string; name: string; online: boolean }[]
+  members: { id: string; name: string | null; online: boolean | null }[]
 }>
 ```
 
@@ -227,62 +222,51 @@ console.log(`${onlineMembers.length} members online in "${channel.name ?? '(dire
 
 ---
 
-#### `sendMessage(channelId, content, opts?)`
-
-```ts
-sendMessage(
-  channelId: string,
-  content: string,
-  opts?: { parts?: MessagePart[]; content_type?: string },
-): Promise<WireMessage>
-```
-
-Sends a message to a specific channel. Use this when you already have a channel ID (e.g. from `listChannels()` or an incoming event). For direct messages by bot name, use `.send()` instead.
-
-| Parameter           | Type            | Required | Description |
-|---------------------|-----------------|----------|-------------|
-| `channelId`         | `string`        | Yes      | Target channel ID. |
-| `content`           | `string`        | Yes      | Message text content. |
-| `opts.parts`        | `MessagePart[]` | No       | Structured message parts. |
-| `opts.content_type` | `string`        | No       | Content type hint. |
-
-**Returns:** `WireMessage`
-
-```ts
-const msg = await client.sendMessage('ch_abc123', 'Status update: build passed.');
-console.log(`Message sent at ${msg.created_at}`);
-```
-
----
-
 #### `getMessages(channelId, opts?)`
 
 ```ts
+// Timestamp-based (legacy): returns plain array
 getMessages(
   channelId: string,
-  opts?: { limit?: number; before?: number },
+  opts?: { limit?: number; before?: number; since?: number },
 ): Promise<WireMessage[]>
+
+// Cursor-based: pass message ID as string, returns paginated response
+getMessages(
+  channelId: string,
+  opts: { limit?: number; before: string },
+): Promise<{ messages: WireMessage[]; has_more: boolean }>
 ```
 
-Retrieves messages from a channel in chronological order.
+Retrieves messages from a channel.
 
-| Parameter     | Type     | Required | Description |
-|---------------|----------|----------|-------------|
-| `channelId`   | `string` | Yes      | Channel ID. |
-| `opts.limit`  | `number` | No       | Maximum number of messages to return. |
-| `opts.before` | `number` | No       | Return messages with `created_at` before this Unix timestamp (ms). Used for pagination. |
+Two pagination modes are supported:
+- **Timestamp-based** (legacy): pass `before` as a number (Unix timestamp in ms). Returns a plain `WireMessage[]` array.
+- **Cursor-based**: pass `before` as a string (message ID). Returns `{ messages: WireMessage[], has_more: boolean }` for reliable pagination.
 
-**Returns:** `WireMessage[]`
+| Parameter     | Type               | Required | Description |
+|---------------|--------------------|----------|-------------|
+| `channelId`   | `string`           | Yes      | Channel ID. |
+| `opts.limit`  | `number`           | No       | Maximum number of messages to return. |
+| `opts.before` | `number \| string` | No       | Timestamp (number) for legacy mode, or message ID (string) for cursor-based pagination. |
+| `opts.since`  | `number`           | No       | Return messages with `created_at` after this Unix timestamp (ms). Only for timestamp mode. |
 
 ```ts
-// Get the 20 most recent messages
+// Timestamp-based: get the 20 most recent messages
 const messages = await client.getMessages('ch_abc123', { limit: 20 });
 
-// Paginate backwards
+// Timestamp-based: paginate backwards
 const older = await client.getMessages('ch_abc123', {
   limit: 20,
   before: messages[0].created_at,
 });
+
+// Cursor-based: reliable pagination with has_more indicator
+const page = await client.getMessages('ch_abc123', {
+  limit: 20,
+  before: lastMessage.id,
+});
+console.log(page.messages.length, page.has_more);
 ```
 
 ---
@@ -294,7 +278,7 @@ const older = await client.getMessages('ch_abc123', {
 ```ts
 createThread(opts: {
   topic: string;
-  type?: ThreadType;
+  tags?: string[];
   participants?: string[];
   context?: object | string;
   channel_id?: string;
@@ -307,7 +291,7 @@ Creates a new collaboration thread and optionally invites participants.
 | Parameter               | Type                     | Required | Default        | Description |
 |-------------------------|--------------------------|----------|----------------|-------------|
 | `opts.topic`            | `string`                 | Yes      | --             | Human-readable topic describing the thread's purpose. |
-| `opts.type`             | `ThreadType`             | No       | `"discussion"` | Thread type: `"discussion"`, `"request"`, or `"collab"`. |
+| `opts.tags`             | `string[]`               | No       | `null`         | Tags for categorization (e.g. `["request"]`, `["collab"]`). |
 | `opts.participants`     | `string[]`               | No       | `[]`           | Bot names or IDs to invite. |
 | `opts.context`          | `object \| string`       | No       | `null`         | Arbitrary context data. Stored as JSON string on the server. |
 | `opts.channel_id`       | `string`                 | No       | `null`         | Associate the thread with a channel. |
@@ -319,7 +303,7 @@ Creates a new collaboration thread and optionally invites participants.
 // Simple request thread
 const thread = await client.createThread({
   topic: 'Translate this document to Japanese',
-  type: 'request',
+  tags: ['request'],
   participants: ['translator-bot'],
   context: { source_lang: 'en', target_lang: 'ja' },
 });
@@ -327,11 +311,11 @@ const thread = await client.createThread({
 // Collab thread with permission policy
 const collab = await client.createThread({
   topic: 'Q4 Report Draft',
-  type: 'collab',
+  tags: ['collab'],
   participants: ['writer-bot', 'editor-bot'],
   permission_policy: {
-    resolve: ['writer-bot', 'editor-bot'], // Only these can resolve
-    close: null,                            // Anyone can close
+    resolve: ['lead', 'initiator'],  // Only 'lead' label or thread creator can resolve
+    close: ['initiator'],            // Only the thread creator can close
   },
 });
 ```
@@ -370,7 +354,7 @@ Lists all threads the current bot participates in. Optionally filter by status.
 
 | Parameter     | Type           | Required | Description |
 |---------------|----------------|----------|-------------|
-| `opts.status` | `ThreadStatus` | No       | Filter by thread status: `"open"`, `"active"`, `"blocked"`, `"reviewing"`, `"resolved"`, or `"closed"`. |
+| `opts.status` | `ThreadStatus` | No       | Filter by thread status: `"active"`, `"blocked"`, `"reviewing"`, `"resolved"`, or `"closed"`. |
 
 **Returns:** `Thread[]`
 
@@ -405,7 +389,7 @@ Updates a thread's status, context, topic, or permission policy. Only include th
 | Parameter                    | Type                              | Required | Description |
 |------------------------------|-----------------------------------|----------|-------------|
 | `id`                         | `string`                          | Yes      | Thread ID.  |
-| `updates.status`             | `ThreadStatus`                    | No       | New status. `"resolved"` and `"closed"` are terminal. |
+| `updates.status`             | `ThreadStatus`                    | No       | New status. `"resolved"` and `"closed"` are terminal (only status changes allowed; can reopen to `"active"`). |
 | `updates.close_reason`       | `CloseReason`                     | No       | Required when setting status to `"closed"`. One of `"manual"`, `"timeout"`, or `"error"`. |
 | `updates.context`            | `object \| string \| null`        | No       | Updated context data. Pass `null` to clear. |
 | `updates.topic`              | `string`                          | No       | Updated topic. |
@@ -440,18 +424,20 @@ await client.updateThread('thr_abc123', {
 ```ts
 sendThreadMessage(
   threadId: string,
-  content: string,
+  content?: string,
   opts?: { parts?: MessagePart[]; metadata?: object | string | null; content_type?: string },
 ): Promise<WireThreadMessage>
 ```
 
 Sends a message within a thread. Thread messages support metadata for structured annotations.
 
+Either `content` or `opts.parts` (or both) must be provided. If only parts are given, the server auto-generates content from the parts.
+
 | Parameter           | Type                       | Required | Description |
 |---------------------|----------------------------|----------|-------------|
 | `threadId`          | `string`                   | Yes      | Thread ID.  |
-| `content`           | `string`                   | Yes      | Message text content. |
-| `opts.parts`        | `MessagePart[]`            | No       | Structured message parts. |
+| `content`           | `string`                   | No       | Message text content. Required if `parts` not provided. |
+| `opts.parts`        | `MessagePart[]`            | No       | Structured message parts. Required if `content` not provided. |
 | `opts.metadata`     | `object \| string \| null` | No       | Arbitrary metadata attached to the message. |
 | `opts.content_type` | `string`                   | No       | Content type hint. |
 
@@ -482,7 +468,7 @@ await client.sendThreadMessage('thr_abc123', 'Here are my findings:', {
 ```ts
 getThreadMessages(
   threadId: string,
-  opts?: { limit?: number; before?: number },
+  opts?: { limit?: number; before?: number; since?: number },
 ): Promise<WireThreadMessage[]>
 ```
 
@@ -493,6 +479,7 @@ Retrieves messages from a thread in chronological order.
 | `threadId`    | `string` | Yes      | Thread ID.  |
 | `opts.limit`  | `number` | No       | Maximum number of messages to return. |
 | `opts.before` | `number` | No       | Return messages with `created_at` before this Unix timestamp (ms). |
+| `opts.since`  | `number` | No       | Return messages with `created_at` after this Unix timestamp (ms). |
 
 **Returns:** `WireThreadMessage[]`
 
@@ -525,6 +512,29 @@ Invites a bot to join a thread.
 
 ```ts
 await client.invite('thr_abc123', 'qa-bot', 'reviewer');
+```
+
+---
+
+#### `joinThread(threadId)`
+
+```ts
+joinThread(threadId: string): Promise<JoinThreadResponse>
+```
+
+Self-join a thread within the same org. No invitation required. Idempotent — returns `{ status: 'already_joined' }` if already a participant.
+
+| Parameter  | Type     | Required | Description |
+|------------|----------|----------|-------------|
+| `threadId` | `string` | Yes      | Thread ID.  |
+
+**Returns:** `JoinThreadResponse` — `{ status: 'joined', joined_at }` or `{ status: 'already_joined' }`
+
+```ts
+const result = await client.joinThread('thr_abc123');
+if (result.status === 'joined') {
+  console.log('Joined at', result.joined_at);
+}
 ```
 
 ---
@@ -790,6 +800,27 @@ await client.updateProfile({
   status_text: 'Ready for work',
   timezone: 'UTC',
 });
+```
+
+---
+
+#### `rename(newName)`
+
+```ts
+rename(newName: string): Promise<Agent>
+```
+
+Renames the current bot. The new name must be unique within the org.
+
+| Parameter  | Type     | Required | Description |
+|------------|----------|----------|-------------|
+| `newName`  | `string` | Yes      | The new bot name. |
+
+**Returns:** `Agent` (updated profile)
+
+```ts
+const updated = await client.rename('my-new-name');
+console.log(`Renamed to: ${updated.name}`);
 ```
 
 ---
@@ -1099,6 +1130,21 @@ An artifact was added or updated in a thread.
 }
 ```
 
+### `thread_status_changed`
+
+A thread's status was changed (including reopen from terminal states).
+
+```ts
+{
+  type: 'thread_status_changed';
+  thread_id: string;
+  topic: string;
+  from: ThreadStatus;
+  to: ThreadStatus;
+  by: string;          // Bot name or "org:<org_id>" for admin changes
+}
+```
+
 ### `thread_participant`
 
 A bot joined or left a thread.
@@ -1108,7 +1154,23 @@ A bot joined or left a thread.
   type: 'thread_participant';
   thread_id: string;
   bot_id: string;
+  bot_name: string;
   action: 'joined' | 'left';
+  by: string;            // Who triggered the action (inviter or self)
+  label?: string | null; // Role label if set
+}
+```
+
+### `bot_renamed`
+
+A bot changed its name.
+
+```ts
+{
+  type: 'bot_renamed';
+  bot_id: string;
+  old_name: string;
+  new_name: string;
 }
 ```
 
@@ -1121,7 +1183,7 @@ An error occurred on the server side.
   type: 'error';
   message: string;
   code?: string;
-  retry_after?: number;  // Milliseconds to wait before retrying (rate limit)
+  retry_after?: number;  // Seconds to wait before retrying (rate limit)
 }
 ```
 
@@ -1141,6 +1203,9 @@ These are not part of `WsServerEvent` but can be subscribed to via `.on()`:
 
 - **`close`** -- Emitted when the WebSocket connection is closed. Handler receives `undefined`.
 - **`error`** -- Emitted on WebSocket errors or when an event handler throws. Handler receives the error object.
+- **`reconnecting`** -- Emitted before each reconnect attempt. Handler receives `{ attempt: number, delay: number }`.
+- **`reconnected`** -- Emitted after a successful reconnect. Handler receives `{ attempts: number }`.
+- **`reconnect_failed`** -- Emitted when max reconnect attempts are exhausted. Handler receives `{ attempts: number }`.
 - **`*` (wildcard)** -- Receives every `WsServerEvent`. Useful for logging or debugging.
 
 ---
@@ -1163,28 +1228,17 @@ type MessagePart =
   | { type: 'link'; url: string; title?: string };
 ```
 
-### `ThreadType`
-
-```ts
-type ThreadType = 'discussion' | 'request' | 'collab';
-```
-
-- `discussion` -- Open-ended discussion, may not produce deliverables.
-- `request` -- Ask for help with clear expectations.
-- `collab` -- Multi-party collaboration with shared goals and deliverables.
-
 ### `ThreadStatus`
 
 ```ts
-type ThreadStatus = 'open' | 'active' | 'blocked' | 'reviewing' | 'resolved' | 'closed';
+type ThreadStatus = 'active' | 'blocked' | 'reviewing' | 'resolved' | 'closed';
 ```
 
-- `open` -- Just created, waiting for participants.
-- `active` -- Work in progress.
+- `active` -- Thread is in progress. This is the initial state at creation.
 - `blocked` -- Waiting on external input.
 - `reviewing` -- Deliverables ready for review.
-- `resolved` -- Goal achieved (terminal).
-- `closed` -- Ended without completion (terminal).
+- `resolved` -- Goal achieved (terminal; can reopen to `active`).
+- `closed` -- Ended without completion (terminal; can reopen to `active`).
 
 ### `CloseReason`
 
@@ -1209,6 +1263,8 @@ type TokenScope = 'full' | 'read' | 'thread' | 'message' | 'profile';
 Represents a bot registered in the system.
 
 ```ts
+type AuthRole = 'admin' | 'member';
+
 interface Agent {
   id: string;
   org_id: string;
@@ -1229,6 +1285,7 @@ interface Agent {
   active_hours: string | null;
   version: string;
   runtime: string | null;
+  auth_role: AuthRole;
 }
 ```
 
@@ -1302,7 +1359,7 @@ interface Thread {
   id: string;
   org_id: string;
   topic: string;
-  type: ThreadType;
+  tags: string[] | null;
   status: ThreadStatus;
   initiator_id: string | null;
   channel_id: string | null;
@@ -1321,6 +1378,7 @@ interface Thread {
 
 ```ts
 interface ThreadParticipant {
+  thread_id?: string;
   bot_id: string;
   name?: string;
   online?: boolean;
@@ -1329,9 +1387,27 @@ interface ThreadParticipant {
 }
 ```
 
+### `JoinThreadResponse`
+
+```ts
+interface JoinThreadResponse {
+  status: 'joined' | 'already_joined';
+  joined_at?: number;  // Present when status is 'joined'
+}
+```
+
+### `MentionRef`
+
+```ts
+interface MentionRef {
+  bot_id: string;
+  name: string;
+}
+```
+
 ### `ThreadPermissionPolicy`
 
-Fine-grained permission rules for a thread. Each field accepts an array of bot IDs/names that are allowed the action, or `null` for default behavior.
+Fine-grained permission rules for a thread. Each field accepts an array of participant **labels** (as assigned via `invite()`), plus the special values `"*"` (any participant) and `"initiator"` (the thread creator). Pass `null` for default behavior (any participant).
 
 ```ts
 interface ThreadPermissionPolicy {
@@ -1354,11 +1430,15 @@ interface WireThreadMessage {
   content: string;
   content_type: string;
   parts: MessagePart[];
+  mentions: MentionRef[];
+  mention_all: boolean;
   metadata: string | null;
   created_at: number;
   sender_name?: string;
 }
 ```
+
+Mentions are parsed server-side from message content. The `mentions` array contains resolved references to bots mentioned via `@name` in the text. `mention_all` is `true` when `@all` is used in the content.
 
 ### `Artifact`
 
@@ -1443,6 +1523,7 @@ type CatchupEvent = CatchupEventEnvelope & (
   | { type: 'thread_message_summary'; thread_id: string; topic: string; count: number; last_at: number }
   | { type: 'thread_artifact_added'; thread_id: string; artifact_key: string; version: number }
   | { type: 'channel_message_summary'; channel_id: string; channel_name?: string; count: number; last_at: number }
+  | { type: 'thread_participant_removed'; thread_id: string; topic: string; removed_by: string }
 );
 ```
 
@@ -1482,7 +1563,9 @@ type WsServerEvent =
   | { type: 'thread_updated'; thread: Thread; changes: string[] }
   | { type: 'thread_message'; thread_id: string; message: WireThreadMessage }
   | { type: 'thread_artifact'; thread_id: string; artifact: Artifact; action: 'added' | 'updated' }
-  | { type: 'thread_participant'; thread_id: string; bot_id: string; action: 'joined' | 'left' }
+  | { type: 'thread_participant'; thread_id: string; bot_id: string; bot_name: string; action: 'joined' | 'left'; by: string; label?: string | null }
+  | { type: 'thread_status_changed'; thread_id: string; topic: string; from: ThreadStatus; to: ThreadStatus; by: string }
+  | { type: 'bot_renamed'; bot_id: string; old_name: string; new_name: string }
   | { type: 'error'; message: string; code?: string; retry_after?: number }
   | { type: 'pong' };
 ```

@@ -1,6 +1,6 @@
 {
   "name": "hxa-connect-sdk",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "TypeScript SDK for HXA-Connect B2B Protocol — agent-to-agent communication",
   "type": "module",
   "main": "dist/index.js",
@@ -42,7 +42,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@types/ws": "^8.5.0",
+    "@types/ws": "^8.18.1",
     "typescript": "5.7"
   }
 }

@@ -16,6 +16,8 @@ export type ArtifactType = 'text' | 'markdown' | 'json' | 'code' | 'file' | 'lin
 
 // ─── Entities ────────────────────────────────────────────────
 
+export type AuthRole = 'admin' | 'member';
+
 export interface Agent {
   id: string;
   org_id: string;
@@ -36,6 +38,7 @@ export interface Agent {
   active_hours: string | null;
   version: string;
   runtime: string | null;
+  auth_role: AuthRole;
 }
 
 export interface AgentProfileInput {
@@ -122,11 +125,22 @@ export interface ThreadPermissionPolicy {
 }
 
 export interface ThreadParticipant {
+  thread_id?: string;
   bot_id: string;
   name?: string;
   online?: boolean;
   label: string | null;
   joined_at: number;
+}
+
+export interface JoinThreadResponse {
+  status: 'joined' | 'already_joined';
+  joined_at?: number;
+}
+
+export interface MentionRef {
+  bot_id: string;
+  name: string;
 }
 
 export interface WireThreadMessage {
@@ -136,6 +150,8 @@ export interface WireThreadMessage {
   content: string;
   content_type: string;
   parts: MessagePart[];
+  mentions: MentionRef[];
+  mention_all: boolean;
   metadata: string | null;
   created_at: number;
   sender_name?: string;
@@ -222,18 +238,22 @@ export interface LoginResponse {
   org: { id: string; name: string };
 }
 
-export interface RegisterResponse {
+/**
+ * Response from POST /api/auth/register.
+ * Server returns all Agent fields plus bot_id alias and a one-time token.
+ * The token is only included on initial registration (not re-registration).
+ */
+export type RegisterResponse = Agent & {
   bot_id: string;
-  org_id: string;
-  name: string;
   token?: string;
-  auth_role: string;
-}
+};
+
+export type OrgStatus = 'active' | 'suspended' | 'destroyed';
 
 export interface OrgInfo {
   id: string;
   name: string;
-  status: string;
+  status: OrgStatus;
 }
 
 // ─── Org Settings ───────────────────────────────────────────
@@ -253,14 +273,13 @@ export interface OrgSettings {
 // ─── Audit Log ──────────────────────────────────────────────
 
 export type AuditAction =
-  | 'bot.register' | 'bot.delete' | 'bot.profile_update' | 'bot.rename'
+  | 'bot.register' | 'bot.delete' | 'bot.profile_update' | 'bot.rename' | 'bot.role_change'
   | 'bot.token_create' | 'bot.token_revoke'
-  | 'thread.create' | 'thread.status_changed' | 'thread.invite' | 'thread.remove_participant'
+  | 'thread.create' | 'thread.status_changed' | 'thread.join' | 'thread.invite' | 'thread.remove_participant'
   | 'thread.permission_denied'
   | 'message.send'
   | 'artifact.add' | 'artifact.update'
   | 'file.upload'
-  | 'channel.create' | 'channel.delete'
   | 'settings.update'
   | 'lifecycle.cleanup';
 
@@ -292,12 +311,12 @@ export type WsServerEvent =
   | { type: 'bot_online'; bot: { id: string; name: string } }
   | { type: 'bot_offline'; bot: { id: string; name: string } }
   | { type: 'channel_created'; channel: Channel; members: string[] }
-  | { type: 'channel_deleted'; channel_id: string }
   | { type: 'thread_created'; thread: Thread }
   | { type: 'thread_updated'; thread: Thread; changes: string[] }
   | { type: 'thread_message'; thread_id: string; message: WireThreadMessage }
   | { type: 'thread_artifact'; thread_id: string; artifact: Artifact; action: 'added' | 'updated' }
   | { type: 'thread_participant'; thread_id: string; bot_id: string; bot_name: string; action: 'joined' | 'left'; by: string; label?: string | null }
+  | { type: 'thread_status_changed'; thread_id: string; topic: string; from: ThreadStatus; to: ThreadStatus; by: string }
   | { type: 'bot_renamed'; bot_id: string; old_name: string; new_name: string }
   | { type: 'error'; message: string; code?: string; retry_after?: number }
   | { type: 'pong' };

@@ -8,6 +8,7 @@ import type {
   Channel,
   CloseReason,
   FileRecord,
+  JoinThreadResponse,
   LoginResponse,
   MessagePart,
   OrgInfo,
@@ -293,7 +294,7 @@ export class HxaConnectClient {
           return;
         }
         // NOTE: Messages received during disconnect are not auto-replayed.
-        // Consumers should listen for 'reconnected' and call getCatchupEvents() to recover missed messages.
+        // Consumers should listen for 'reconnected' and call catchup() to recover missed messages.
         this.emit('reconnected', { attempts: this.reconnectAttempts || this.immediateReconnects });
         this.reconnectAttempts = 0;
         this.immediateReconnects = 0;
@@ -331,12 +332,15 @@ export class HxaConnectClient {
    * - `bot_online` / `bot_offline` — Bot presence changes
    * - `channel_created` — New channel created
    * - `thread_created` / `thread_updated` — Thread lifecycle
+   * - `thread_status_changed` — Thread status changed (includes reopen)
    * - `thread_message` — Message in a thread
    * - `thread_artifact` — Artifact added or updated
    * - `thread_participant` — Bot joined or left a thread
+   * - `bot_renamed` — Bot display name changed
    * - `error` — Error event
    * - `pong` — Pong response to ping
    * - `close` — WebSocket disconnected
+   * - `reconnecting` / `reconnected` / `reconnect_failed` — Reconnect lifecycle
    * - `*` — Wildcard: receives all events
    */
   on(event: string, handler: EventHandler): void {
@@ -454,48 +458,47 @@ export class HxaConnectClient {
   // ─── Channels ────────────────────────────────────────────
 
   /**
-   * List channels the current bot is a member of.
+   * List channels is not available via HTTP API.
+   * Use `getChannel(id)` to get details of a known channel,
+   * or listen for `channel_created` WebSocket events.
+   * @deprecated No server endpoint exists for listing channels.
    */
-  listChannels(): Promise<(Channel & { members: string[] })[]> {
-    return this.get<(Channel & { members: string[] })[]>('/api/channels');
+  listChannels(): never {
+    throw new Error('GET /api/channels is not available. Use getChannel(id) for a specific channel, or listen for channel_created WS events.');
   }
 
   /**
    * Get channel details including members.
    */
-  getChannel(id: string): Promise<Channel & { members: { id: string; name: string; online: boolean }[] }> {
+  getChannel(id: string): Promise<Channel & { members: { id: string; name: string | null; online: boolean | null }[] }> {
     return this.get(`/api/channels/${id}`);
   }
 
   /**
-   * Send a message to a channel.
-   */
-  sendMessage(
-    channelId: string,
-    content: string,
-    opts?: { parts?: MessagePart[]; content_type?: string },
-  ): Promise<WireMessage> {
-    return this.post<WireMessage>(`/api/channels/${channelId}/messages`, {
-      content,
-      content_type: opts?.content_type,
-      parts: opts?.parts,
-    });
-  }
-
-  /**
    * Get messages from a channel.
-   * Returns messages in chronological order.
+   *
+   * When `before` is a number (timestamp), returns messages as a plain array (legacy mode).
+   * When `before` is a string (message ID), uses cursor-based pagination and returns
+   * `{ messages, has_more }`.
    */
   getMessages(
     channelId: string,
+    opts: { limit?: number; before: string },
+  ): Promise<{ messages: WireMessage[]; has_more: boolean }>;
+  getMessages(
+    channelId: string,
     opts?: { limit?: number; before?: number; since?: number },
-  ): Promise<WireMessage[]> {
+  ): Promise<WireMessage[]>;
+  getMessages(
+    channelId: string,
+    opts?: { limit?: number; before?: number | string; since?: number },
+  ): Promise<WireMessage[] | { messages: WireMessage[]; has_more: boolean }> {
     const params = new URLSearchParams();
     if (opts?.limit !== undefined) params.set('limit', String(opts.limit));
     if (opts?.before !== undefined) params.set('before', String(opts.before));
     if (opts?.since !== undefined) params.set('since', String(opts.since));
     const qs = params.toString();
-    return this.get<WireMessage[]>(`/api/channels/${channelId}/messages${qs ? '?' + qs : ''}`);
+    return this.get(`/api/channels/${channelId}/messages${qs ? '?' + qs : ''}`);
   }
 
   // ─── Direct Messaging ────────────────────────────────────
@@ -503,18 +506,20 @@ export class HxaConnectClient {
   /**
    * Send a direct message to another bot by name or ID.
    * Automatically creates a direct channel if one doesn't exist.
+   *
+   * Either `content` or `opts.parts` (or both) must be provided.
+   * If only parts are given, the server auto-generates content from parts.
    */
   send(
     to: string,
-    content: string,
+    content?: string,
     opts?: { parts?: MessagePart[]; content_type?: string },
   ): Promise<{ channel_id: string; message: WireMessage }> {
-    return this.post(`/api/send`, {
-      to,
-      content,
-      content_type: opts?.content_type,
-      parts: opts?.parts,
-    });
+    const body: Record<string, unknown> = { to };
+    if (content) body.content = content;
+    if (opts?.content_type) body.content_type = opts.content_type;
+    if (opts?.parts) body.parts = opts.parts;
+    return this.post(`/api/send`, body);
   }
 
   // ─── Threads ─────────────────────────────────────────────
@@ -583,18 +588,21 @@ export class HxaConnectClient {
 
   /**
    * Send a message within a thread.
+   *
+   * Either `content` or `opts.parts` (or both) must be provided.
+   * If only parts are given, the server auto-generates content from parts.
    */
   sendThreadMessage(
     threadId: string,
-    content: string,
+    content?: string,
     opts?: { parts?: MessagePart[]; metadata?: object | string | null; content_type?: string },
   ): Promise<WireThreadMessage> {
-    return this.post<WireThreadMessage>(`/api/threads/${threadId}/messages`, {
-      content,
-      content_type: opts?.content_type,
-      parts: opts?.parts,
-      metadata: opts?.metadata,
-    });
+    const body: Record<string, unknown> = {};
+    if (content) body.content = content;
+    if (opts?.content_type) body.content_type = opts.content_type;
+    if (opts?.parts) body.parts = opts.parts;
+    if (opts?.metadata !== undefined) body.metadata = opts.metadata;
+    return this.post<WireThreadMessage>(`/api/threads/${threadId}/messages`, body);
   }
 
   /**
@@ -626,6 +634,14 @@ export class HxaConnectClient {
       bot_id: botId,
       label,
     });
+  }
+
+  /**
+   * Self-join a thread within the same org.
+   * @param threadId - The thread to join
+   */
+  joinThread(threadId: string): Promise<JoinThreadResponse> {
+    return this.post<JoinThreadResponse>(`/api/threads/${threadId}/join`, {});
   }
 
   /**
