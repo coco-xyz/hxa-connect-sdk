@@ -478,20 +478,26 @@ export class HxaConnectClient {
    * Send a message to a channel via WebSocket.
    * Requires an active WebSocket connection.
    * For HTTP-based DMs, use `send(to, content)` instead.
+   *
+   * Either `content` or `opts.parts` (or both) must be provided.
+   * If only parts are given, the server auto-generates content from parts.
    */
   sendMessage(
     channelId: string,
-    content: string,
+    content?: string,
     opts?: { parts?: MessagePart[]; content_type?: string },
   ): void {
     if (!this.ws || this.ws.readyState !== 1) {
       throw new Error('WebSocket not connected. Use send(to, content) for HTTP-based messaging, or connect() first.');
     }
+    if (!content && !opts?.parts) {
+      throw new Error('Either content or parts must be provided.');
+    }
     const payload: Record<string, unknown> = {
       type: 'send',
       channel_id: channelId,
-      content,
     };
+    if (content) payload.content = content;
     if (opts?.content_type) payload.content_type = opts.content_type;
     if (opts?.parts) payload.parts = opts.parts;
     this.ws.send(JSON.stringify(payload));
@@ -499,18 +505,29 @@ export class HxaConnectClient {
 
   /**
    * Get messages from a channel.
-   * Returns messages in chronological order.
+   *
+   * When `before` is a number (timestamp), returns messages as a plain array (legacy mode).
+   * When `before` is a string (message ID), uses cursor-based pagination and returns
+   * `{ messages, has_more }`.
    */
   getMessages(
     channelId: string,
+    opts: { limit?: number; before: string },
+  ): Promise<{ messages: WireMessage[]; has_more: boolean }>;
+  getMessages(
+    channelId: string,
     opts?: { limit?: number; before?: number; since?: number },
-  ): Promise<WireMessage[]> {
+  ): Promise<WireMessage[]>;
+  getMessages(
+    channelId: string,
+    opts?: { limit?: number; before?: number | string; since?: number },
+  ): Promise<WireMessage[] | { messages: WireMessage[]; has_more: boolean }> {
     const params = new URLSearchParams();
     if (opts?.limit !== undefined) params.set('limit', String(opts.limit));
     if (opts?.before !== undefined) params.set('before', String(opts.before));
     if (opts?.since !== undefined) params.set('since', String(opts.since));
     const qs = params.toString();
-    return this.get<WireMessage[]>(`/api/channels/${channelId}/messages${qs ? '?' + qs : ''}`);
+    return this.get(`/api/channels/${channelId}/messages${qs ? '?' + qs : ''}`);
   }
 
   // ─── Direct Messaging ────────────────────────────────────
@@ -518,18 +535,20 @@ export class HxaConnectClient {
   /**
    * Send a direct message to another bot by name or ID.
    * Automatically creates a direct channel if one doesn't exist.
+   *
+   * Either `content` or `opts.parts` (or both) must be provided.
+   * If only parts are given, the server auto-generates content from parts.
    */
   send(
     to: string,
-    content: string,
+    content?: string,
     opts?: { parts?: MessagePart[]; content_type?: string },
   ): Promise<{ channel_id: string; message: WireMessage }> {
-    return this.post(`/api/send`, {
-      to,
-      content,
-      content_type: opts?.content_type,
-      parts: opts?.parts,
-    });
+    const body: Record<string, unknown> = { to };
+    if (content) body.content = content;
+    if (opts?.content_type) body.content_type = opts.content_type;
+    if (opts?.parts) body.parts = opts.parts;
+    return this.post(`/api/send`, body);
   }
 
   // ─── Threads ─────────────────────────────────────────────
@@ -598,18 +617,21 @@ export class HxaConnectClient {
 
   /**
    * Send a message within a thread.
+   *
+   * Either `content` or `opts.parts` (or both) must be provided.
+   * If only parts are given, the server auto-generates content from parts.
    */
   sendThreadMessage(
     threadId: string,
-    content: string,
+    content?: string,
     opts?: { parts?: MessagePart[]; metadata?: object | string | null; content_type?: string },
   ): Promise<WireThreadMessage> {
-    return this.post<WireThreadMessage>(`/api/threads/${threadId}/messages`, {
-      content,
-      content_type: opts?.content_type,
-      parts: opts?.parts,
-      metadata: opts?.metadata,
-    });
+    const body: Record<string, unknown> = {};
+    if (content) body.content = content;
+    if (opts?.content_type) body.content_type = opts.content_type;
+    if (opts?.parts) body.parts = opts.parts;
+    if (opts?.metadata !== undefined) body.metadata = opts.metadata;
+    return this.post<WireThreadMessage>(`/api/threads/${threadId}/messages`, body);
   }
 
   /**

@@ -238,18 +238,22 @@ export interface LoginResponse {
   org: { id: string; name: string };
 }
 
-export interface RegisterResponse {
+/**
+ * Response from POST /api/auth/register.
+ * Server returns all Agent fields plus bot_id alias and a one-time token.
+ * The token is only included on initial registration (not re-registration).
+ */
+export type RegisterResponse = Agent & {
   bot_id: string;
-  org_id: string;
-  name: string;
   token?: string;
-  auth_role: string;
-}
+};
+
+export type OrgStatus = 'active' | 'suspended' | 'destroyed';
 
 export interface OrgInfo {
   id: string;
   name: string;
-  status: string;
+  status: OrgStatus;
 }
 
 // ─── Org Settings ───────────────────────────────────────────

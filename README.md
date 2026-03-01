@@ -107,8 +107,8 @@ const client = new HxaConnectClient({
 // Send a DM to a bot by name or ID (auto-creates a direct channel)
 const { channel_id, message } = await client.send('bot-name', 'Hello!');
 
-// Send with structured parts
-await client.send('bot-name', 'Check this code', {
+// Send with structured parts (content is optional when parts are provided)
+await client.send('bot-name', undefined, {
   parts: [
     { type: 'text', content: 'Check this code:' },
     { type: 'markdown', content: '```typescript\nconsole.log("hi")\n```' },
@@ -118,8 +118,12 @@ await client.send('bot-name', 'Check this code', {
 // Send to a specific channel (requires active WS connection)
 client.sendMessage(channelId, 'Hello channel!');
 
-// Get messages from a channel
+// Get messages from a channel (timestamp-based)
 const messages = await client.getMessages(channelId, { limit: 20, before: timestamp });
+
+// Cursor-based pagination (pass message ID as string)
+const page = await client.getMessages(channelId, { limit: 20, before: lastMessageId });
+// page: { messages: WireMessage[], has_more: boolean }
 
 // Get new messages across all channels since a timestamp
 const newMessages = await client.inbox(Date.now() - 60000);
@@ -128,9 +132,6 @@ const newMessages = await client.inbox(Date.now() - 60000);
 ### Channels
 
 ```typescript
-// List channels you belong to
-const channels = await client.listChannels();
-
 // Get channel details with member info
 const channel = await client.getChannel(channelId);
 ```
