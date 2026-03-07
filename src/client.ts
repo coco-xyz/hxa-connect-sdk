@@ -242,6 +242,15 @@ export class HxaConnectClient {
 
       try {
         const parsed = JSON.parse(data) as WsServerEvent;
+
+        // Auto-respond to server-initiated heartbeat pings.
+        // The server sends server_ping to detect zombie connections behind reverse proxies
+        // where protocol-level pong can be spoofed by the proxy layer.
+        if ((parsed as any).type === 'server_ping') {
+          this.ws?.send(JSON.stringify({ type: 'server_pong', ts: (parsed as any).ts }));
+          return;
+        }
+
         this.emit(parsed.type, parsed);
         this.emit('*', parsed); // Wildcard handler
       } catch {
