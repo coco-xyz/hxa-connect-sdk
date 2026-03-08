@@ -228,6 +228,8 @@ export class ThreadContext {
   }
 
   private isMention(message: WireThreadMessage): boolean {
+    // mention_all (@all / @所有人) triggers delivery for all bots
+    if (message.mention_all) return true;
     // Check text content of all parts
     const textContent = this.extractText(message);
     return this.opts.triggerPatterns.some(pattern => {
