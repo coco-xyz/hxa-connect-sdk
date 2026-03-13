@@ -7,6 +7,9 @@ import type {
   CatchupResponse,
   Channel,
   CloseReason,
+  DownloadFileInput,
+  DownloadFileOptions,
+  DownloadFileResult,
   FileRecord,
   JoinThreadResponse,
   LoginResponse,
@@ -820,6 +823,123 @@ export class HxaConnectClient {
    */
   getFileUrl(fileId: string): string {
     return `${this.baseUrl}/api/files/${fileId}`;
+  }
+
+  /**
+   * Resolve a DownloadFileInput to the full download URL.
+   * Accepts { fileId } or { url } — the file ID is treated as opaque.
+   */
+  private resolveFileUrl(input: DownloadFileInput): string {
+    if ('fileId' in input) {
+      return `${this.baseUrl}/api/files/${encodeURIComponent(input.fileId)}`;
+    }
+    // Hub-relative URL (e.g. "/api/files/abc-123") → absolute
+    if (input.url.startsWith('/')) {
+      return `${this.baseUrl}${input.url}`;
+    }
+    return input.url;
+  }
+
+  /**
+   * Download a file from the Hub.
+   * Accepts a file ID or Hub-relative URL (the ID is treated as opaque — no format constraints).
+   * Streams the response body with a size guard to prevent OOM on large files.
+   * Throws ApiError on non-2xx responses.
+   */
+  async downloadFile(
+    input: DownloadFileInput | string,
+    opts?: DownloadFileOptions,
+  ): Promise<DownloadFileResult> {
+    const maxBytes = opts?.maxBytes ?? 10 * 1024 * 1024; // 10 MB default
+    const timeout = opts?.timeout ?? this.timeout;
+
+    // Accept plain string as fileId for convenience
+    const resolved: DownloadFileInput = typeof input === 'string' ? { fileId: input } : input;
+    const url = this.resolveFileUrl(resolved);
+
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${this.token}`,
+    };
+    if (this.orgId) {
+      headers['X-Org-Id'] = this.orgId;
+    }
+
+    // Combine timeout and external signal
+    const signals: AbortSignal[] = [AbortSignal.timeout(timeout)];
+    if (opts?.signal) signals.push(opts.signal);
+    const combinedSignal = signals.length === 1 ? signals[0] : AbortSignal.any(signals);
+
+    const response = await fetch(url, {
+      headers,
+      signal: combinedSignal,
+    });
+
+    if (!response.ok) {
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        body = await response.text().catch(() => null);
+      }
+      throw new ApiError(response.status, body);
+    }
+
+    // Early reject if Content-Length exceeds limit
+    const clHeader = response.headers.get('content-length');
+    if (clHeader && parseInt(clHeader, 10) > maxBytes) {
+      await response.body?.cancel();
+      throw new Error(`File too large: ${parseInt(clHeader, 10)} bytes exceeds limit of ${maxBytes}`);
+    }
+
+    // Stream body with size guard
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    for await (const chunk of response.body!) {
+      totalBytes += chunk.length;
+      if (totalBytes > maxBytes) {
+        break; // for-await cleanup cancels the stream
+      }
+      chunks.push(chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk));
+    }
+
+    if (totalBytes > maxBytes) {
+      throw new Error(`File too large: exceeded limit of ${maxBytes} bytes during download`);
+    }
+
+    // Merge chunks
+    const buffer = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      buffer.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    const contentType = (response.headers.get('content-type') || 'application/octet-stream')
+      .split(';')[0]
+      .trim();
+
+    return { buffer, contentType, size: totalBytes };
+  }
+
+  /**
+   * Download a file from the Hub and save it to a local path.
+   * Convenience wrapper around downloadFile() + fs write.
+   * Node.js only — requires fs/promises.
+   */
+  async downloadToPath(
+    input: DownloadFileInput | string,
+    outputPath: string,
+    opts?: DownloadFileOptions,
+  ): Promise<DownloadFileResult & { path: string }> {
+    const result = await this.downloadFile(input, opts);
+
+    // Dynamic import to keep SDK browser-compatible at type level
+    const { mkdir, writeFile } = await import('node:fs/promises');
+    const { dirname } = await import('node:path');
+    await mkdir(dirname(outputPath), { recursive: true });
+    await writeFile(outputPath, result.buffer);
+
+    return { ...result, path: outputPath };
   }
 
   // ─── Catchup (Offline Event Replay) ──────────────────────

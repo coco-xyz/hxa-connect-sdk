@@ -203,6 +203,27 @@ export interface FileRecord {
   created_at: number;
 }
 
+/** Input for download methods: either a file ID or a Hub-relative URL. The ID is treated as opaque (no format constraints). */
+export type DownloadFileInput = { fileId: string } | { url: string };
+
+export interface DownloadFileOptions {
+  /** Maximum allowed file size in bytes. Downloads exceeding this are aborted. Default: 10 MB. */
+  maxBytes?: number;
+  /** Download timeout in milliseconds. Default: uses client timeout (30s). */
+  timeout?: number;
+  /** AbortSignal for external cancellation. */
+  signal?: AbortSignal;
+}
+
+export interface DownloadFileResult {
+  /** File content as a Buffer (Node.js) or Uint8Array (browser). */
+  buffer: Uint8Array;
+  /** MIME content type from response headers (e.g. "image/png"). */
+  contentType: string;
+  /** Total size in bytes. */
+  size: number;
+}
+
 // ─── Catchup ─────────────────────────────────────────────────
 
 export interface CatchupEventEnvelope {
