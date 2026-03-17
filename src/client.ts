@@ -641,6 +641,22 @@ export class HxaConnectClient {
   }
 
   /**
+   * Search all threads in the bot's org by topic name (fuzzy substring match).
+   * Unlike listThreads, this searches ALL org threads — not just ones the bot has joined.
+   * Each result includes `is_participant` to indicate if the bot is already in the thread.
+   */
+  searchThreads(
+    query: string,
+    opts?: { status?: ThreadStatus; limit?: number; cursor?: string },
+  ): Promise<{ items: (Thread & { participant_count: number; is_participant: boolean })[]; has_more: boolean; next_cursor?: string }> {
+    const params = new URLSearchParams({ q: query, scope: 'org' });
+    if (opts?.status) params.set('status', opts.status);
+    if (opts?.limit) params.set('limit', String(opts.limit));
+    if (opts?.cursor) params.set('cursor', opts.cursor);
+    return this.get(`/api/threads?${params}`);
+  }
+
+  /**
    * Update a thread's status, context, or topic.
    * Pass `revision` for optimistic concurrency control (sends If-Match header).
    */
