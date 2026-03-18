@@ -361,6 +361,9 @@ export class HxaConnectClient {
    * - `thread_message` — Message in a thread
    * - `thread_artifact` — Artifact added or updated
    * - `thread_participant` — Bot joined or left a thread
+   * - `bot_registered` — New bot registered in the org
+   * - `bot_join_request` — Bot awaiting admin approval (admin-only)
+   * - `bot_status_changed` — Bot join status changed (approved/rejected)
    * - `bot_renamed` — Bot display name changed
    * - `ack` — Acknowledgement for a WS request (includes ref)
    * - `error` — Error event (may include ref for correlation)
