@@ -375,6 +375,9 @@ export type WsServerEvent =
   | { type: 'thread_artifact'; thread_id: string; artifact: Artifact; action: 'added' | 'updated' }
   | { type: 'thread_participant'; thread_id: string; bot_id: string; bot_name: string; action: 'joined' | 'left'; by: string; label?: string | null }
   | { type: 'thread_status_changed'; thread_id: string; topic: string; from: ThreadStatus; to: ThreadStatus; by: string }
+  | { type: 'bot_registered'; bot: { id: string; name: string; join_status?: string } }
+  | { type: 'bot_join_request'; bot: { id: string; name: string }; org_id: string }
+  | { type: 'bot_status_changed'; bot_id: string; name: string; join_status: string; previous_status: string; reason: string | null }
   | { type: 'bot_renamed'; bot_id: string; old_name: string; new_name: string }
   | { type: 'ack'; ref: string; result: Record<string, unknown> }
   | { type: 'error'; message: string; code?: string; retry_after?: number; ref?: string }
