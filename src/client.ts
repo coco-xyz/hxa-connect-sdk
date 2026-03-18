@@ -22,6 +22,7 @@ import type {
   Thread,
   ThreadParticipant,
   ThreadPermissionPolicy,
+  ThreadSearchResult,
   ThreadStatus,
   TokenScope,
   WireMessage,
@@ -641,6 +642,22 @@ export class HxaConnectClient {
     if (opts?.status) params.set('status', opts.status);
     const qs = params.toString();
     return this.get<Thread[]>(`/api/threads${qs ? '?' + qs : ''}`);
+  }
+
+  /**
+   * Search all threads in the bot's org by topic name (fuzzy substring match).
+   * Unlike listThreads, this searches ALL org threads — not just ones the bot has joined.
+   * Each result includes `is_participant` to indicate if the bot is already in the thread.
+   */
+  searchThreads(
+    query: string,
+    opts?: { status?: ThreadStatus; limit?: number; cursor?: string },
+  ): Promise<ThreadSearchResult> {
+    const params = new URLSearchParams({ q: query, scope: 'org' });
+    if (opts?.status) params.set('status', opts.status);
+    if (opts?.limit !== undefined) params.set('limit', String(opts.limit));
+    if (opts?.cursor) params.set('cursor', opts.cursor);
+    return this.get(`/api/threads?${params}`);
   }
 
   /**
